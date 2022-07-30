@@ -60,9 +60,10 @@ The output of the ALU can also be inverted as an extra selection beyond the oper
 ## Instruction Set Architecture
 The opcodes for ROCKET88 follow a consistent pattern based on their addressing mode and behavior. To see the Instruction Set Architecture (ISA) organized in a tabular form, see the [spreadsheet](Rocket88.ods) in this repo. While some instructions in the ISA have unique behavior and arbitrary placement in the opcode table, the majority are have opcodes that are encoded according to their behavior. The basic structure of most opcodes are as follows.
 
-| Bit:   | 7   | 6 | 5 | 4 |    3   |      2    |     1    |    0   |
-|--------|-----|---|---|---|--------|-----------|----------|--------|
-| Field: | Operation | | | | Option | Source/Destination Addressing |
+<table>
+<tr><th>Bit:</th><th>7</th><th>6</th><th>5</th><th>4</th><th>3</th><th>2</th><th>1</th><th>0</th></tr>
+<tr><td>Field:</td><td colspan=4>Operation</td><td>Option</td><td colspan=3>Source/Destination Addressing</td></tr>
+</table>
 
 The lower 3 bits determine the addressing mode for the opcode, and that will not only determine how data is routed through the processor, but also how many operand bytes will follow the opcode in the program. Most opcodes stand alone and have no operands, but those using the immediate or direct addressing modes will have one or two bytes of operands following the opcode that will need to be fetched to execute the full instruction.
 
@@ -102,10 +103,52 @@ Indirect addressing lets you use BC as an address register, and reference data a
 
 The mnemonic for this mode is to have BC in parentheses instead of a fixed address.
 
+There are also special instructions that use indirect addressing with the DD register, using (DD) for the operand mnemonic.
+
 #### Stack (7)
 Stack addressing uses the stack pointer to reference the current top of the stack. As the stack pointer is a dedicated register, opcodes using this mode are implicit.
 
 The mnemonic for this mode is to have SP in parenteses, but some instructions (like PHA) that only support this mode will not require any assembly operand.
 
 ### Status Flags
+
+The processor status register, or P for short, contains the status flags that can be affected by the outcomes of certain instructions, and further affect the behavior of the next instruction. While P can be treated as an 8-bit register just like A, B or C, it actually has only six bits, one for each flag. The lower two bits of P do not correspond to any actual flag, so their value is undefined and should be ignored. The upper 6 bits are defined as follows.
+
+| Bit:   | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+|--------|---|---|---|---|---|---|---|---|
+| Flag:  | S | Z | C | I | D | K | - | - |
+
+The letters used for each flag are not directly part of the assembly language mnemonics, but are mainly used for the sake of documentation.
+
+#### Sign (S)
+
+The Sign flag is set when the resulting value is negative, effectively being the same as bit 7. The case of comparison instrctions, S is set when the value in the base register is less than the operand value.
+
+#### Zero (Z)
+
+The zero flag is set when the resulting value is zero. In the case of comparison instructions, Z is set when the values are equal.
+
+#### Carry (C)
+
+The carry flag -- not to be confused with the C register -- is set when a carry or borrow is required when performing arithmetic, to be used by the next arithmetic instruction. It is also used as an effective ninth bit for shifting instructions. For comparison instructions, C is set when the value in the base register is greater than or equal to the operand value.
+
+#### Interrupt Disable (I)
+
+Maskable instrupts are disabled when the I flag is set, and IRQ signals are ignored until the flag is cleared again. The Interrupt Disable flag does not disable Non-Maskable Interrupts or the Reset signal.
+
+#### Decimal (D)
+
+When the Decimal flag is set, addition and subtraction instructions treat input values as binary-coded decimal (BCD), and will output BCD values as well. All instructions revert to binary arithmetic when D is cleared.
+
+#### Break (K)
+
+The break bit is set when the break instruction is executed, can be pulled from the stack along with the rest of the P register, but is cleared by any other instruction. This is mainly read from the stack to determine whether the IRQ routine was triggered by a hardware interrupt or a software-induced break.
+
+### Opcode Table
+
+This table shows which opcodes are documented instructions, and links to the entry for that instruction in the [Instruction Set Reference](instructions.md).
+
+
+
+
 
