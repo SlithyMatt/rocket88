@@ -83,20 +83,23 @@ The mnemonic will be to simply have A as the assembly operand to specify this mo
 #### B Register (2), C Register (3)
 The B and C registers can also be addressed in the same manner as the A register.
 
+#### 16-bit Register
+Certain special instructions deal with the value in the BC, DD and EE registers. They only require an implicit opcode, but the assembly mnemonics will use the two-letter register name as an operand.
+
 #### Immediate (4)
 Immediate addressing will have a single byte as the operand value inline with the code, rather than fetching it from a register or elsewhere in memory. This will require an additional single byte in the code after the opcode, so all instructions using this mode will need to advance the PC by two bytes instead of just one.
 
-The mnemonic for this mode is to precede the immediate value with a hash symbol (#) to indicate that it is a number to be taken at face value and not an address or offset.
+The mnemonic for this mode is to precede the immediate value with a hash symbol (#) to indicate that it is a number to be taken at face value and not an address or offset. For the purposes of this documentation, "#N" will be a generic placeholder for an immediate operand, with "N" standing in for a specific 8-bit value.
 
 #### Relative (4)
 For jump instructions, there is no purpose for Immediate addressing, so instead jump opcodes that are have immediate encoding actually use relative addressing, which requires a single byte operand, just like immediate mode. However, this value will be a signed offset that will be added to the PC if the jump condition is met.
 
-The mnemonic for this is to use a label, and the assembler will calculate the offset to use for machine code. If the address that label resolves to is too far away from the current PC (more than 128 bytes before, or 127 bytes after), then this will be an assembly error.
+The mnemonic for this is to use a label, and the assembler will calculate the offset to use for machine code. If the address that label resolves to is too far away from the current PC (more than 128 bytes before, or 127 bytes after), then this will be an assembly error. For the purposes of this documentation, "label" will be a generic placholder for any label that resolves to a specific address within the range of relative addressing.
 
 #### Absolute (5)
 Absolute addressing will have a 16-bit (two bytes, little endian) address as an operand, and may require a read from or write to that address to execute the instruction. At any rate, three bytes need to be fetched to get the opcode and address operand, advancing the PC by three.
 
-The mnemonic for this mode is to simply have the address value with no extra punctuation, like a hash or parentheses.
+The mnemonic for this mode is to simply have the address value with no extra punctuation, like a hash or parentheses. For the purposes of this documentation, "NN" will be a generic placeholder for an absolute address.
 
 #### Indirect (6)
 Indirect addressing lets you use BC as an address register, and reference data at the address in BC. This means that there is no need to have an operand after the opcode, making it implicit like direct register addressing.
@@ -146,9 +149,30 @@ The break bit is set when the break instruction is executed, can be pulled from 
 
 ### Opcode Table
 
-This table shows which opcodes are documented instructions, and links to the entry for that instruction in the [Instruction Set Reference](instructions.md).
+This table shows which opcodes are documented instructions, and links to the entry for that instruction in the [Instruction Set Reference](doc/instructions.md).
+
+|    | x0  | x1  | x2  | x3  | x4  | x5  | x6  | x7  | x8  | x9  | xA  | xB  | xC  | xD  | xE  | xF  |
+|----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|
+| 0x | [NOP](doc/nop.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>b</sub>](#note-b) | [<sub>c</sub>](#note-c) |  [<sub>a</sub>](#note-a) |  [<sub>a</sub>](#note-a) |  [<sub>a</sub>](#note-a) |  [<sub>a</sub>](#note-a) |  [<sub>a</sub>](#note-a) |  [<sub>a</sub>](#note-a) | [<sub>b</sub>](#note-b) | [<sub>c</sub>](#note-c) |  [<sub>a</sub>](#note-a) |  [<sub>a</sub>](#note-a) |
+| 1x | [LDAZ](doc/ldx.md#lda-ldaz) | [LDA A](doc/ldx.md#lda-ldaz) | [LDA B](doc/ldx.md#lda-ldaz) | [LDA C](doc/ldx.md#lda-ldaz) | [LDA #N](doc/ldx.md#lda-ldaz) | [LDA NN](doc/ldx.md#lda-ldaz) | [LDA (BC)](doc/ldx.md#lda-ldaz) | [PLA](doc/plx.md#pla) | [CPAZ](doc/cpx.md#cpa-cpaz) | [CPA A](doc/cpx.md#cpa-cpaz) | [CPA B](doc/cpx.md#cpa-cpaz) | [CPA C](doc/cpx.md#cpa-cpaz) | [CPA #N](doc/cpx.md#cpa-cpaz) | [STA NN](doc/stx.md#sta) | [STA (BC)](doc/stx.md#sta) | [PHA](doc/phx.md#pha) |
+| 2x | [LDBZ](doc/ldx.md#ldb-ldbz) | [LDB A](doc/ldx.md#ldb-ldbz) | [LDB B](doc/ldx.md#ldb-ldbz) | [LDB C](doc/ldx.md#ldb-ldbz) | [LDB #N](doc/ldx.md#ldb-ldbz) | [LDB NN](doc/ldx.md#ldb-ldbz) | [LDB (BC)](doc/ldx.md#ldb-ldbz) | [PLB](doc/plx.md#plb) | [CPBZ](doc/cpx.md#cpb-cpbz) | [CPB A](doc/cpx.md#cpb-cpbz) | [CPB B](doc/cpx.md#cpb-cpbz) | [CPB C](doc/cpx.md#cpb-cpbz) | [CPB #N](doc/cpx.md#cpb-cpbz) | [STB NN](doc/stx.md#stb) | [STB (BC)](doc/stx.md#stb) | [PHB](doc/phx.md#phb) |
+| 3x | [LDCZ](doc/ldx.md#ldc-ldcz) | [LDC A](doc/ldx.md#ldc-ldcz) | [LDC B](doc/ldx.md#ldc-ldcz) | [LDC C](doc/ldx.md#ldc-ldcz) | [LDC #N](doc/ldx.md#ldc-ldcz) | [LDC NN](doc/ldx.md#ldc-ldcz) | [LDC (BC)](doc/ldx.md#ldc-ldcz) | [PLC](doc/plx.md#plc) | [CPCZ](doc/cpx.md#cpc-cpcz) | [CPC A](doc/cpx.md#cpc-cpcz) | [CPC B](doc/cpx.md#cpc-cpcz) | [CPC C](doc/cpx.md#cpc-cpcz) | [CPC #N](doc/cpx.md#cpc-cpcz) | [STC NN](doc/stx.md#stc) | [STC (BC)](doc/stx.md#stc) | [PHC](doc/phx.md#phc) |
+| 4x | [EXD](doc/exx.md#exd) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JMPR label](doc/jmp.md#jmpr) | [JMP NN](doc/jmp.md#jmp) | [JMP (BC)](doc/jmp.md#jmp) | [<sub>a</sub>](#note-a) | [EXE](doc/exx.md#exe) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JSRR label](doc/jsr.md#jsrr) | [JSR NN](doc/jsr.md#jsr) | [JSR (BC)](doc/jsr.md#jsr) | [<sub>a</sub>](#note-a) |
+| 5x | [LDA (DD)](doc/ldx.md#lda-ldaz) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JPNZ label](doc/jmp.md#jpnz) | [JMPZ NN](doc/jmp.md#jmpz) | [JMPZ (BC)](doc/jmp.md#jmpz) | [<sub>a</sub>](#note-a) | [STA (DD)](doc/stx.md#sta) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JSNZ label](doc/jsr.md#jsnz) | [JSRZ NN](doc/jsr.md#jsrz) | [JSRZ (BC)](doc/jsr.md#jsrz) | [<sub>a</sub>](#note-a) |
+| 6x | [INC DD](doc/inc.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JMPP label](doc/jmp.md#jmpp) | [JMPN NN](doc/jmp.md#jmpn) | [JMPN (BC)](doc/jmp.md#jmpn) | [<sub>a</sub>](#note-a) | [DEC DD](doc/dec.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JSRP label](doc/jsr.md#jsrp) | [JSRN NN](doc/jsr.md#jsrn) | [JSRN (BC)](doc/jsr.md#jsrn) | [<sub>a</sub>](#note-a) |
+| 7x | [INC EE](doc/inc.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JPNC label](doc/jmp.md#jpnc) | [JMPC NN](doc/jmp.md#jmpc) | [JMPC (BC)](doc/jmp.md#jmpc) | [<sub>a</sub>](#note-a) | [DEC EE](doc/dec.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JSNC label](doc/jsr.md#jsnc) | [JSRC NN](doc/jsr.md#jsrc) | [JSRC (BC)](doc/jsr.md#jsrc) | [<sub>a</sub>](#note-a) |
+| 8x | [ADDZ](doc/add.md#add-addz) | [ADD A](doc/add.md#add-addz) | [ADD B](doc/add.md#add-addz) | [ADD C](doc/add.md#add-addz) | [ADD #N](doc/add.md#add-addz) | [ADD NN](doc/add.md#add-addz) | [ADD (BC)](doc/add.md#add-addz) | [INC A](doc/inc.md) | [ADCZ](doc/add.md#adc-adcz) | [ADC A](doc/add.md#adc-adcz) | [ADC B](doc/add.md#adc-adcz) | [ADC C](doc/add.md#adc-adcz) | [ADC #N](doc/add.md#adc-adcz) | [ADC NN](doc/add.md#adc-adcz) | [ADC (BC)](doc/add.md#adc-adcz) | [INC B](doc/inc.md) |
 
 
 
+
+#### Note a
+Effectively the same as NOP.
+
+#### Note b
+Effectively the same as NOP, but also expects a one-byte operand that will be fetched but ignored.
+
+#### Note c
+Effectively the same as NOP, but also expects a two-byte operand that will be fetched but ignored.
 
 
