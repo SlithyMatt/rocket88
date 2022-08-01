@@ -162,17 +162,22 @@ This table shows which opcodes are documented instructions, and links to the ent
 | 6x | [INC DD](doc/inc.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JMPP label](doc/jmp.md#jmpp) | [JMPN NN](doc/jmp.md#jmpn) | [JMPN (BC)](doc/jmp.md#jmpn) | [<sub>a</sub>](#note-a) | [DEC DD](doc/dec.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JSRP label](doc/jsr.md#jsrp) | [JSRN NN](doc/jsr.md#jsrn) | [JSRN (BC)](doc/jsr.md#jsrn) | [<sub>a</sub>](#note-a) |
 | 7x | [INC EE](doc/inc.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JPNC label](doc/jmp.md#jpnc) | [JMPC NN](doc/jmp.md#jmpc) | [JMPC (BC)](doc/jmp.md#jmpc) | [<sub>a</sub>](#note-a) | [DEC EE](doc/dec.md) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [<sub>a</sub>](#note-a) | [JSNC label](doc/jsr.md#jsnc) | [JSRC NN](doc/jsr.md#jsrc) | [JSRC (BC)](doc/jsr.md#jsrc) | [<sub>a</sub>](#note-a) |
 | 8x | [ADDZ](doc/add.md#add-addz) | [ADD A](doc/add.md#add-addz) | [ADD B](doc/add.md#add-addz) | [ADD C](doc/add.md#add-addz) | [ADD #N](doc/add.md#add-addz) | [ADD NN](doc/add.md#add-addz) | [ADD (BC)](doc/add.md#add-addz) | [INC A](doc/inc.md) | [ADCZ](doc/add.md#adc-adcz) | [ADC A](doc/add.md#adc-adcz) | [ADC B](doc/add.md#adc-adcz) | [ADC C](doc/add.md#adc-adcz) | [ADC #N](doc/add.md#adc-adcz) | [ADC NN](doc/add.md#adc-adcz) | [ADC (BC)](doc/add.md#adc-adcz) | [INC B](doc/inc.md) |
-
-
+| 9x | [SUBZ](doc/sub.md#sub-subz) | [SUB A](doc/sub.md#sub-subz) | [SUB B](doc/sub.md#sub-subz) | [SUB C](doc/sub.md#sub-subz) | [SUB #N](doc/sub.md#sub-subz) | [SUB NN](doc/sub.md#sub-subz) | [SUB (BC)](doc/sub.md#sub-subz) | [INC C](doc/inc.md) | [SBCZ](doc/sub.md#sbc-sbcz) | [SBC A](doc/sub.md#sbc-sbcz) | [SBC B](doc/sub.md#sbc-sbcz) | [SBC C](doc/sub.md#sbc-sbcz) | [SBC #N](doc/sub.md#sbc-sbcz) | [SBC NN](doc/sub.md#sbc-sbcz) | [SBC (BC)](doc/sub.md#sbc-sbcz) | [DEC A](doc/dec.md) |
+| Ax | [<sub>a</sub>](#note-a) | [LSR A](doc/lsr.md) | [LSR B](doc/lsr.md) | [LSR C](doc/lsr.md) | [<sub>b</sub>](#note-b) | [LSR NN](doc/lsr.md) | [LSR (BC)](doc/lsr.md) | [DEC B](doc/dec.md) | [<sub>a</sub>](#note-a) | [ROR A](doc/ror.md) | [ROR B](doc/ror.md) | [ROR C](doc/ror.md) | [<sub>b</sub>](#note-b) | [ROR NN](doc/ror.md) | [ROR (BC)](doc/ror.md) | [DEC C](doc/dec.md) |
+| Bx | [<sub>a</sub>](#note-a) | [ASL A](doc/asl.md) | [ASL B](doc/asl.md) | [ASL C](doc/asl.md) | [<sub>b</sub>](#note-b) | [ASL NN](doc/asl.md) | [ASL (BC)](doc/asl.md) | [NEG](doc/neg.md) | [<sub>a</sub>](#note-a) | [ROL A](doc/rol.md) | [ROL B](doc/rol.md) | [ROL C](doc/rol.md) | [<sub>b</sub>](#note-b) | [ROL NN](doc/rol.md) | [ROL (BC)](doc/rol.md) | [INC (BC)](doc/inc.md) |
+| Cx | [ORZ](doc/or.md#ora-orz) | [ORA A](doc/or.md#ora-orz) | [ORA B](doc/or.md#ora-orz) | [ORA C](doc/or.md#ora-orz) | [ORA #N](doc/or.md#ora-orz) | [ORA NN](doc/or.md#ora-orz) | [ORA (BC)](doc/or.md#ora-orz) | [INV B](doc/inv.md) | [NORZ](doc/or.md#nor-norz) | [NOR A](doc/or.md#nor-norz) | [NOR B](doc/or.md#nor-norz) | [NOR C](doc/or.md#nor-norz) | [NOR #N](doc/or.md#nor-norz) | [NOR NN](doc/or.md#nor-norz) | [NOR (BC)](doc/or.md#nor-norz) | [INV C](doc/inv.md) | 
+| Dx | [ANDZ](doc/and.md#and-andz) | [AND A](doc/and.md#and-andz) | [AND B](doc/and.md#and-andz) | [AND C](doc/and.md#and-andz) | [AND #N](doc/and.md#and-andz) | [AND NN](doc/and.md#and-andz) | [AND (BC)](doc/and.md#and-andz) | [SED](doc/set.md#sed) | [NNDZ](doc/and.md#nnd-nndz) | [NND A](doc/doc/and.md#nnd-nndz) | [NND B](doc/doc/and.md#nnd-nndz) | [NND C](doc/doc/and.md#nnd-nndz) | [NND #N](doc/doc/and.md#nnd-nndz) | [NND NN](doc/doc/and.md#nnd-nndz) | [NND (BC)](doc/doc/and.md#nnd-nndz) | [CLD](doc/clx.md#cld) | 
+| Ex | [XORZ](doc/xor.md#xor-xorz) | [XOR A](doc/xor.md#xor-xorz) | [XOR B](doc/xor.md#xor-xorz) | [XOR C](doc/xor.md#xor-xorz) | [XOR #N](doc/xor.md#xor-xorz) | [XOR NN](doc/xor.md#xor-xorz) | [XOR (BC)](doc/xor.md#xor-xorz) | [PHP](doc/phx.md#php) | [XNRZ](doc/xor.md#xnr-xnrz) | [XNR A](doc/doc/xor.md#xnr-xnrz) | [XNR B](doc/doc/xor.md#xnr-xnrz) | [XNR C](doc/doc/xor.md#xnr-xnrz) | [XNR #N](doc/doc/xor.md#xnr-xnrz) | [XNR NN](doc/doc/xor.md#xnr-xnrz) | [XNR (BC)](doc/doc/xor.md#xnr-xnrz) | [PLP](doc/plx.md#plp) | 
+| Fx | [SEI](doc/set.md#sei) | [CLI](doc/clx.md#cli) | [RTS](doc/ret.md#rts) | [RTI](doc/ret.md#rti) | [HLT](doc/hlt.md) | [BRK](doc/brk.md) | [RST](doc/rst.md) | [LDS NN](doc/ldx.md#lds) | [LDS BC](doc/ldx.md#lds) | [LDS (BC)](doc/ldx.md#lds) | [LBCS](doc/ldx.md#lbcs) | [CLC](doc/clx.md#clc) | [SEC](doc/set.md#sec) | [INC BC](doc/inc.md) | [DEC BC](doc/dec.md) | [<sub>a</sub>](#note-a) |
 
 
 #### Note a
-Effectively the same as NOP.
+Effectively the same as NOP. See [NOP documentation](doc/nop.md#implicit).
 
 #### Note b
-Effectively the same as NOP, but also expects a one-byte operand that will be fetched but ignored.
+Effectively the same as NOP, but also expects a one-byte operand that will be fetched but ignored. See [NOP documentation](doc/nop.md#immediate).
 
 #### Note c
-Effectively the same as NOP, but also expects a two-byte operand that will be fetched but ignored.
+Effectively the same as NOP, but also expects a two-byte operand that will be fetched but ignored. See [NOP documentation](doc/nop.md#absolute).
 
 

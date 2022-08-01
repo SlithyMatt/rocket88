@@ -1,0 +1,3 @@
+# ORA, ORZ
+
+# NOR, NORZ
