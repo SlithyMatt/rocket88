@@ -28,12 +28,12 @@ TBD
 
 ## Internal Components
 
-(Core Block Diagram)
+![Component Diagram](components.png)
 
 ### Registers
 ROCKET88 is focused on register manipulation, with most results being stored in the 8-bit Accumulator, or A register. Additionally, there are two 8-bit general purpose registers named B and C, which can form a single 16-bit address register called BC. Then there are two more special-purpose 16-bit address registers: the Program Counter (PC) and the Stack Pointer (SP), allowing code and the stack to occupy any part of the address space. Then the Processor Status register, also known as P, contains all the status bits, and those are mostly accessed individually. Finally, there are two 16-bit shadow registers named DD and EE which can have their values exchanged with BC to have faster access to pointers and counters without having to fetch them from memory.
 
-(Detailed Register Diagram)
+![Register Diagram](registers.png)
 
 For the purposes of this document, we will refer to the high and low bytes of the address registers with the suffixes H and L. For example, the high byte of the Program Counter will be referred to as PCH. In the case of BC, for the sake of simplicty, we will just refer to the individual bytes as B and C, and not BCH and BCL.
 
@@ -105,7 +105,7 @@ The mnemonic will be to simply have A as the assembly operand to specify this mo
 The B and C registers can also be addressed in the same manner as the A register.
 
 #### 16-bit Register
-Certain special instructions deal with the value in the BC, DD and EE registers. They only require an implicit opcode, but the assembly mnemonics will use the two-letter register name as an operand.
+Certain special instructions deal with the value in the BC, DD and EE registers. They only require an implicit opcode, but the assembly mnemonics will use the two-letter register name as an operand. This is not one of the 8 addressing modes that can be encoded within the opcode.
 
 #### Immediate (4)
 Immediate addressing will have a single byte as the operand value inline with the code, rather than fetching it from a register or elsewhere in memory. This will require an additional single byte in the code after the opcode, so all instructions using this mode will need to advance the PC by two bytes instead of just one.
@@ -203,3 +203,8 @@ Effectively the same as NOP, but also expects a two-byte operand that will be fe
 
 ## Repository Contents
 
+### Documentation
+
+### Verilog Core
+
+### Emulator Core Library
