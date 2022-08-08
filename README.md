@@ -16,7 +16,7 @@
 ## External Interface
 Externally, ROCKET88 will have an 8-bit data bus and a 16-bit address bus. It will operate on a single voltage and clock, and have control pins for reading and writing memory. An I/O connected will need to be mapped to memory, requiring external memory management for any system using a ROCKET88 core. The entire 64k memory space can be used in any fashion, except for the last 6 bytes ($FFFA-$FFFF), which will contain 3 interrupt vectors, but they may be mapped to ROM or RAM. These interrupts will be triggered by NMI, IRQ and RESET pins, and there will also be Read and Write control pins, and that is all.
 
-(Pinout Diagram)
+![Pinout Diagram](pinout.png)
 
 At power on, the RESET vector will be fetched and execution will begin at the address read there.
 
@@ -24,7 +24,93 @@ At power on, the RESET vector will be fetched and execution will begin at the ad
 TBD
 
 ### Interrupts
-TBD
+ROCKET88 supports three types of interrupts: Reset, Maskable, and Non-Maskable. These are triggered by the RESET, IRQ and NMI pins, when one of them is held low for the rising edge of a clock cycle. Maskable interrupts can be disabled with software (using the [SEI](doc/set.md#sei) instruction), but a Reset or Non-Maskable Interrupt will always halt program execution and run its service routine. The addresses for these routines must be placed in fixed vectors in memory at the following addresses:
+
+* $FFFA: IRQ Vector
+* $FFFC: NMI Vector
+* $FFFE: RESET Vector
+
+When powered on, ROCKET88 fetches the RESET Vector, and loads the address stored there into the Program Counter, regardless of the state of any of the interrupt pins. This will make the Reset routine at that address the first code to be executed. Because of this, it is expected that the Reset routine will initialize the Stack Pointer and put the system into a state where it can run the intended software. Often, it is desirable to have the Reset handler in ROM, along with the vectors to make sure that a cold boot is possible and predictable. Let's consider a very simple system that has a memory map as follows:
+
+* $0000-?: ROM code variables
+* ?-$0FFF: Default Stack Location
+* $1000-EFFF: Program RAM
+* $F000-FFFF: ROM
+
+Note that the first 4kB of RAM will be comprised of variable and the stack, but there's no clear division between the two. We don't need it for that example, but it is also instructive to note that ROCKET88 will let you grow the stack a large as you want, which could cause it to overflow into code, data, or even attempt to use ROM, even if it means rolling around to the end of memory after pushing back before the beginning. So, it is up to the software developer to make sure that the stack is contained to its intended segment of RAM.
+
+Let's use this memory map to make a very simple system that will initialize some RAM vectors for IRQ and NMI to allow for software-defined interrupt handling. The following program is for a ROM image that will have a Reset handler that sets up RAM variables and eventually jumps into RAM, as well as default hadndling for IRQ and NMI.
+
+```
+IRQ_RAM_VECTOR = $0100
+NMI_RAM_VECTOR = $0102
+
+PROGRAM_START = $1000
+
+.org $F000
+reset_handler:
+   sei                           ; disable maskable interrupts
+   lds PROGRAM_START-1           ; initialize stack pointer
+   lda #default_irq_handler.low  ; initalize IRQ_RAM_VECTOR to contain address of default handler in ROM
+   sta IRQ_RAM_VECTOR
+   lda #default_irw_handler.high
+   sta IRQ_RAM_VECTOR+1
+   lda #default_nmi_handler.low  ; initalize NMI_RAM_VECTOR to contain address of default handler in ROM
+   sta NMI_RAM_VECTOR
+   lda #default_nmi_handler.high
+   sta NMI_RAM_VECTOR+1
+   cli                           ; enable maskable interrupts
+   jmp PROGRAM_START             ; jump to start of program in RAM
+
+irq_handler:
+   ldc IRQ_RAM_VECTOR            ; load address in IRQ_RAM_VECTOR into BC
+   ldb IRQ_RAM_VECTOR+1
+   jmp (bc)                      ; jump there
+
+default_irq_handler:
+   ; do some common, periodic stuff
+   rti
+
+nmi_handler:
+   ldc NMI_RAM_VECTOR            ; load address in NMI_RAM_VECTOR into BC
+   ldb NMI_RAM_VECTOR+1
+   jmp (bc)                      ; jump there
+
+default_nmi_handler:
+   ; do some rare, critical stuff
+   rti
+
+.org $FFFA
+.addr irq_handler
+.addr nmi_handler
+.addr reset_handler
+```
+
+This ROM code will be able to boot the following program that can be loaded into RAM, which will also define its own IRQ handler, but keep the default NMI handler.
+
+```
+IRQ_RAM_VECTOR = $0100           ; this should probably be in an include file
+
+.org $1000
+start:
+   sei                           ; disable maskable interrupts
+   lda #custom_irq_handler.low   ; copy the address of custom_irq_handler to IRQ_RAM_VECTOR
+   sta IRQ_RAM_VECTOR
+   lda #custom_irq_handler.high
+   sta IRQ_RAM_VECTOR+1
+   cli                           ; enable maskable interrupts
+
+loop:
+   hlt                           ; halt until interrupt
+   ; do something after an interrupt
+   jmp loop                      ; keep looping forever
+
+custom_irq_handler:
+   ; do extra special things needed for this program for IRQ conditions
+   rti
+```
+
+So interrupts can be as prescriptive or reactive as the system developer desires. Since IRQs are maskable, they should be triggered by things that are safe to ignore in software. NMIs should occur when a hardware event happens that must be addressed, as they can't be disabled, and like an IRQ it is expected that it will eventually return (usually more quickly than an IRQ, as it has a higher priority) so that the main program can continue. There should be no expectation to return from a Reset, as ROCKET88 will not push the program counter and register states to the stack in that case.
 
 ## Internal Components
 
