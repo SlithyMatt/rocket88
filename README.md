@@ -295,6 +295,7 @@ Effectively the same as NOP, but also expects a two-byte operand that will be fe
 ## Repository Contents
 
 ### Documentation
+If you're reading this, you're there already! All the documentation is in markdown, mostly in the [doc](doc) directory, which contains detailed information about each instruction, as linked in the [opcode table](#opcode-table) above.
 
 ### Verilog Core
 
