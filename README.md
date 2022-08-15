@@ -298,5 +298,6 @@ Effectively the same as NOP, but also expects a two-byte operand that will be fe
 If you're reading this, you're there already! All the documentation is in markdown, mostly in the [doc](doc) directory, which contains detailed information about each instruction, as linked in the [opcode table](#opcode-table) above.
 
 ### Verilog Core
+The code for implementing ROCKET88 on an FPGA is being written in the Verilog hardware description language (HDL). In the [verilog](verliog) directory, you'll find the Verilog code, starting with [Rocket88.v](verilog/Rocket88.v), which is the top-level module for the core. The non-Verilog files (with extensions other than .v) are for a Quartus project that will deploy this core to a specific development board. Using this project isn't necessary if you are using a different board or toolchain, as you can just take the .v files and import them into another project for another board. 
 
 ### Emulator Core Library
