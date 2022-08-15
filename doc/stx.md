@@ -2,7 +2,7 @@
 "STore A"
 
 ## Behavior
-Stores the value in the A register in memory, at the address specified in the operand. Also sets the status flags based on that value.
+Stores the value in the A register in memory, at the address specified in the operand.
 
 ## Addressing Modes
 | Mode        | Opcode (hex) |
