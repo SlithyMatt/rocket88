@@ -133,3 +133,5 @@ dmypy.json
 *.qws
 *.db_info
 *.flock
+*.qns
+*.sci
