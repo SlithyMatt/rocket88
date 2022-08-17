@@ -131,7 +131,6 @@ dmypy.json
 .~*
 *.bak
 *.qws
-*.db_info
-*.flock
+db/
 *.qns
 *.sci
