@@ -29,13 +29,15 @@ wire carryOut;					// carry output value
 wire invOut;					// invert ALU output
 wire decMode;					// decimal mode
 wire carryInEn;				// carry in enable
-wire szOutEn;					// sign/zero out enable
 wire [3:0] regSel;			// register select
 wire regWrite;					// write to register
 wire regRead;					// read from register
 wire signFlag;					// sign flag
 wire zeroFlag;					// zero flag
 wire rightSel;					// right value select (regLeft/intD)
+wire breakFlag;				// break flag
+wire irqEn;						// IRQ enable
+
 
 r88_mc memory_controller (
 	sysClock(sysClock),
@@ -59,9 +61,12 @@ r88_regblock registers (
 	regAddr(regAddr),
 	regRight(regRight),
 	regLeft(regLeft),
-	szOutEn(szOutEn),
 	signFlag(signFlag),
-	zeroFlag(zeroFlag)
+	zeroFlag(zeroFlag),
+	carryIn(carryIn),
+	decMode(decMode),
+	breakFlag(breakFlag),
+	irqEn(irqEn)
 };
 
 r88_alu alu (
@@ -77,5 +82,35 @@ r88_alu alu (
 	carryInEn(carryInEn),
 	rightSel(rightSel)
 );
+
+r88_decoder (
+	sysClock(sysClock),
+	readMem(readMem),
+	writeMem(writeMem),
+	intD(intD),
+	resetReq(resetReq),
+	nmiReq(nmiReq),
+	irq(irq),
+	mc_write_full(mc_write_full),
+	mc_write_low(mc_write_low),
+	mc_write_high(mc_write_high),
+	aluOp(aluOp),
+	regRightSel(regRightSel),
+	regLeftSel(regLeftSel),
+	regAddrSel(regAddrSel),
+	carryIn(carryIn),
+	carryOut(carryOut),
+	invOut(invOut),
+	decMode(decMode),
+	carryInEn(carryInEn),
+	regSel(regSel),
+	regWrite(regWrite),
+	regRead(regRead),
+	signFlag(signFlag),
+	zeroFlag(zeroFlag),
+	rightSel(rightSel),
+	breakFlag(breakFlag),
+	irqEn(irqEn)
+};
 
 endmodule

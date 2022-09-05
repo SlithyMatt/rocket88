@@ -58,3 +58,4 @@ set_global_assignment -name VERILOG_FILE Rocket88.v
 set_global_assignment -name VERILOG_FILE r88_mc.v
 set_global_assignment -name VERILOG_FILE r88_regblock.v
 set_global_assignment -name VERILOG_FILE r88_alu.v
+set_global_assignment -name VERILOG_FILE r88_decoder.v
