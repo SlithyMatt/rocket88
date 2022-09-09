@@ -16,5 +16,19 @@ module r88_mc (
 	input [15:0] regAddr
 );
 
+// Data bus tri-state buffers
+assign extD = writeMem? intD : 8'Z;
+assign intD = readMem? extD : 8'Z;
+
+// External address bus register
+reg [15:0] r_extA;
+assign extA = r_extA;
+
+// Update address bus every clock edge
+always @ edge sysClock begin
+	if mc_write_full r_extA <= regAddr;
+	else if mc_write_low r_extA[7:0] <= intD;
+	else if mc_write_high r_extA[15:8] <= intD;
+end
 
 endmodule
