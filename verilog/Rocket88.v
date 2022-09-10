@@ -88,7 +88,7 @@ r88_alu alu (
 	aluResult(aluResult)
 );
 
-r88_decoder (
+r88_decoder decoder (
 	sysClock(sysClock),
 	readMem(readMem),
 	writeMem(writeMem),
