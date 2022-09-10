@@ -25,29 +25,29 @@ module r88_regblock (
 };
 
 // Accumulator
-reg [7:0] r_A;
+reg [7:0] r_A = 8'h00;
 
 // General Purpose Registers
-reg [7:0] r_B;
-reg [7:0] r_C;
+reg [7:0] r_B = 8'h00;
+reg [7:0] r_C = 8'h00;
 
 // Auxiliary Address Register
-reg [15:0] r_DD;
+reg [15:0] r_DD = 16'h0000;
 
 // Long Index Register
-reg [15:0] r_EE;
+reg [15:0] r_EE = 16'h0000;
 
 // Program Counter
-reg [15:0] r_PC;
+reg [15:0] r_PC = 16'hFFFE;
 
 // Stack Pointer
-reg [15:0] r_SP;
+reg [15:0] r_SP = 16'hFFF9;
 
 // Output Buffers
-reg [7:0] r_regRight;
-reg [7:0] r_regLeft;
-reg [15:0] r_regAddr;
-reg [7:0] r_intD;
+reg [7:0] r_regRight = 8'h00;
+reg [7:0] r_regLeft = 8'h00;
+reg [15:0] r_regAddr = 8'h00;
+reg [7:0] r_intD = 8'h00;
 
 assign regRight = r_regRight;
 assign regLeft = r_regLeft;
@@ -99,17 +99,17 @@ always @ edge sysClock begin
 	end
 	
 	case (regRightSel)
-		2'd0: r_regRight <= r_A;
-		2'd1: r_regRight <= r_B;
-		2'd2: r_regRight <= r_C;
-		default:
+		2'd1: r_regRight <= r_A;
+		2'd2: r_regRight <= r_B;
+		2'd3: r_regRight <= r_C;
+		default: r_regRight <= 8'h00;
 	endcase
 	
 	case (regLeftSel)
-		2'd0: r_regLeft <= r_A;
-		2'd1: r_regLeft <= r_B;
-		2'd2: r_regLeft <= r_C;
-		default:
+		2'd1: r_regLeft <= r_A;
+		2'd2: r_regLeft <= r_B;
+		2'd3: r_regLeft <= r_C;
+		default: r_regLeft <= 8'h00;
 	endcase
 			
 	case (regAddrSel)

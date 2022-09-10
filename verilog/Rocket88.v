@@ -37,6 +37,7 @@ wire zeroFlag;					// zero flag
 wire rightSel;					// right value select (regLeft/intD)
 wire breakFlag;				// break flag
 wire irqEn;						// IRQ enable
+wire aluResult;				// put ALU result on internal data bus
 
 
 r88_mc memory_controller (
@@ -83,7 +84,8 @@ r88_alu alu (
 	invOut(invOut),
 	decMode(decMode),
 	carryInEn(carryInEn),
-	rightSel(rightSel)
+	rightSel(rightSel),
+	aluResult(aluResult)
 );
 
 r88_decoder (
