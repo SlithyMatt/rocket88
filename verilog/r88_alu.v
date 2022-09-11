@@ -29,7 +29,8 @@ assign r_rightOperand = rightSel? intD : regRight;
 
 always @ edge sysClock begin
 	case (aluOp)
-		3'd0: begin // shift left
+		3'd0: s_output <= r_rightOperand; // pass through
+		3'd1: begin // shift left
 			r_output[0] <= carryInEn? carryIn : 0;
 			r_output[1] <= r_rightOperand[0];
 			r_output[2] <= r_rightOperand[1];
@@ -40,7 +41,7 @@ always @ edge sysClock begin
 			r_output[7] <= r_rightOperand[6];
 			r_carryOut <= r_rightOperand[7];
 			end
-		3'd1: begin // shift right
+		3'd2: begin // shift right
 			r_output[0] <= r_rightOperand[1];
 			r_output[1] <= r_rightOperand[2];
 			r_output[2] <= r_rightOperand[3];
@@ -51,18 +52,11 @@ always @ edge sysClock begin
 			r_output[7] <= carryInEn? carryIn : 0;
 			r_carryOut <= regRight[0];
 			end
-		3'd2: begin // compare
-			end
-		3'd3: begin // add
-			end
-		3'd4: begin // subtract
-			end
-		3'd5: begin // or
-			end
-		3'd6: begin // and
-			end
-		3'd7: begin // exclusive or
-			end		
+		3'd3: {r_carryOut, r_output} <= regLeft + r_rightOperand + carryInEn? carryIn : 0; // add
+		3'd4: {r_carryOut, r_output} <= regLeft + ~({r_rightOperand[7],r_rightOperand} + carryInEn? carryIn : 0) + 1; // subtract
+		3'd5: r_output <= r_reg | r_rightOperand; // or
+		3'd6: r_output <= r_reg & r_rightOperand; // and
+		3'd7: r_output <= r_reg ^ r_rightOperand; // exclusive or
 	endcase
 end
 

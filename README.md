@@ -143,11 +143,11 @@ The Decoder acts as the main executive of the processor, reading the opcode into
 The Arithmetic-Logic Unit (ALU) handles all unary and binary operations performed by the processor. It has primary and secondary inputs that can be values taken from registers or the internal data bus, and then outputs to the internal data bus, where the result can be routed to a register, including the MC data register for writing to memory. The Decoder will handle the demuxing of the inputs, and the muxing of the output once the ALU completes its operation. The ALU will handle the following operations.
 
 Unary (secondary input ignored):
+* Pass Through
 * Shift left
 * Shift right
 
 Binary:
-* Compare
 * Add
 * Subtract
 * Or
