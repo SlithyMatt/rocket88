@@ -30,10 +30,25 @@ module r88_decoder (
 	output		zeroFlag,
 	output		rightSel,
 	output		breakFlag,
-	output		irqEn
+	output		irqEn,
+	output		aluResult
 );
 
-reg szOutEn;					// sign/zero out enable
+reg szOutEn = 0;					// sign/zero out enable
+reg r_carryFlag = 0;
+reg r_signFlag = 0;
+reg r_zeroFlag = 1;
+reg r_breakFlag = 0;
+reg r_irqEn = 1;
+reg r_decMode = 0;
+
+assign carryIn = r_carryFlag;
+assign signFlag = r_signFlag;
+assign zeroFlag = r_zeroFlag;
+assign breakFlag = r_breakFlag;
+assign irqEn = r_irqEn;
+assign decMode = r_decMode;
+
 
 
 endmodule

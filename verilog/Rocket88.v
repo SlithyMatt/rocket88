@@ -10,7 +10,7 @@ module Rocket88 (
 	input		nmiReq,			// non-maskable interrupt (NMI) request
 	input		irq,				// maskable interrupt request (IRQ)
 	input		sysClock,		// system clock
-	output	[15:0] extA,	// external address bus
+	output	[15:0] extA 	// external address bus
 );
 
 wire [7:0] intD;				// internal data bus
@@ -115,7 +115,8 @@ r88_decoder decoder (
 	zeroFlag(zeroFlag),
 	rightSel(rightSel),
 	breakFlag(breakFlag),
-	irqEn(irqEn)
+	irqEn(irqEn),
+	aluResult(aluResult)
 };
 
 endmodule
