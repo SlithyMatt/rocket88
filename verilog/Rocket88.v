@@ -14,15 +14,17 @@ module Rocket88 (
 );
 
 wire [7:0] intD;				// internal data bus
+wire [7:0] highOut;			// ALU output high byte
 wire mc_write_full;			// write full address to memory controller
 wire mc_write_low;			// write low byte of address to memory controller
 wire mc_write_high;			// write high byte of address to memory controller
 wire [15:0] regAddr;			// address register value
 wire [7:0] regRight;			// right register value
-wire [7:0] regLeft;			// left register value
+wire [15:0] regLeft;			// left register value
 wire [2:0] aluOp;				// arithmetic logic unit (ALU) operation
 wire [1:0] regRightSel;		// right register selection
-wire [1:0] regLeftSel;		// left register selection
+wire [2:0] regLeftSel;		// left register selection
+wire regLeft16;				// left register 16-bits
 wire [1:0] regAddrSel;		// address register selection
 wire carryIn;					// carry input value
 wire carryOut;					// carry output value
@@ -56,9 +58,11 @@ r88_mc memory_controller (
 r88_regblock registers (
 	sysClock(sysClock),
 	intD(intD),
+	highOut(highOut),
 	regSel(regSel),
 	regRightSel(regRightSel),
 	regLeftSel(regLeftSel),
+	regLeft16(regLeft16),
 	regAddrSel(regAddrSel),
 	regWrite(regWrite),
 	regRead(regRead),
@@ -76,8 +80,10 @@ r88_regblock registers (
 r88_alu alu (
 	sysClock(sysClock),
 	intD(intD),
+	highOut(highOut),
 	regRight(regRight),
 	regLeft(regLeft),
+	regLeft16(regLeft16),
 	aluOp(aluOp),
 	carryIn(carryIn),
 	carryOut(carryOut),
@@ -102,6 +108,7 @@ r88_decoder decoder (
 	aluOp(aluOp),
 	regRightSel(regRightSel),
 	regLeftSel(regLeftSel),
+	regLeft16(regLeft16),
 	regAddrSel(regAddrSel),
 	carryIn(carryIn),
 	carryOut(carryOut),

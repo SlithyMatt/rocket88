@@ -6,9 +6,11 @@
 module r88_regblock (
 	input 	sysClock,
 	inout 	[7:0] intD,
+	input		[7:0] highOut,
 	input 	[3:0] regSel,
 	input    [1:0] regRightSel,
 	input    [1:0] regLeftSel,
+	input		regLeft16,
 	input    [1:0] regAddrSel,
 	input 	regWrite,
 	input 	regRead,
@@ -55,7 +57,7 @@ assign regAddr = r_regAddr;
 assign intD = regRead? r_intD : 8'Z;
 
 // Update outputs every clock edge
-always @ edge sysClock begin
+always @ sysClock begin
 	if regRead begin
 		case (regSel)
 			3'd0: r_intD <= r_A;
@@ -96,6 +98,15 @@ always @ edge sysClock begin
 			3'd10: r_SP[15:8] <= intD;
 			default: ; // do nothing
 		endcase
+		if (regLeft16) begin
+			case (regSel)
+				3'd3: r_DD[15:8] <= highOut;
+				3'd5: r_EE[15:8] <= highOut;
+				3'd7: r_PC[15:8] <= highOut;
+				3'd9: r_SP[15:8] <= highOut;
+				default: ; // do nothing
+			endcase
+		end
 	end
 	
 	case (regRightSel)
@@ -105,12 +116,22 @@ always @ edge sysClock begin
 		default: r_regRight <= 8'h00;
 	endcase
 	
-	case (regLeftSel)
-		2'd1: r_regLeft <= r_A;
-		2'd2: r_regLeft <= r_B;
-		2'd3: r_regLeft <= r_C;
-		default: r_regLeft <= 8'h00;
-	endcase
+	if (regLeft16) begin
+		case (regLeftSel)		
+			2'd0: r_regLeft <= r_DD;
+			2'd1: r_regLeft <= r_EE;
+			2'd2: r_regLeft <= r_PC;
+			2'd3: r_regLeft <= r_SP;
+		endcase
+	else begin
+		r_regLeft[15:8] <= 8'h00;
+		case (regLeftSel)		
+			2'd0: r_regLeft[7:0] <= 8'h00;
+			2'd1: r_regLeft[7:0] <= r_A;
+			2'd2: r_regLeft[7:0] <= r_B;
+			2'd3: r_regLeft[7:0] <= r_C;
+		endcase
+	end
 			
 	case (regAddrSel)
 		2'd0: begin

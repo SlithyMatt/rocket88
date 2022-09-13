@@ -17,6 +17,7 @@ module r88_decoder (
 	output 		[2:0] aluOp,
 	output		[1:0] regRightSel,
 	output		[1:0] regLeftSel,
+	output		regLeft16,
 	output		[1:0] regAddrSel,
 	output		carryIn,
 	input    	carryOut,
@@ -41,6 +42,7 @@ reg r_zeroFlag = 1;
 reg r_breakFlag = 0;
 reg r_irqEn = 1;
 reg r_decMode = 0;
+reg r_regLeft16 = 0;
 
 assign carryIn = r_carryFlag;
 assign signFlag = r_signFlag;
@@ -48,7 +50,7 @@ assign zeroFlag = r_zeroFlag;
 assign breakFlag = r_breakFlag;
 assign irqEn = r_irqEn;
 assign decMode = r_decMode;
-
+assign regLeft16 = r_regLeft16;
 
 
 endmodule
