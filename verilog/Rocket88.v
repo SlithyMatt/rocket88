@@ -40,7 +40,7 @@ wire rightSel;					// right value select (regLeft/intD)
 wire breakFlag;				// break flag
 wire irqEn;						// IRQ enable
 wire aluResult;				// put ALU result on internal data bus
-
+wire incPC;						// increment the Program Counter
 
 r88_mc memory_controller (
 	sysClock(sysClock),
@@ -74,7 +74,8 @@ r88_regblock registers (
 	carryIn(carryIn),
 	decMode(decMode),
 	breakFlag(breakFlag),
-	irqEn(irqEn)
+	irqEn(irqEn),
+	incPC(incPC)
 };
 
 r88_alu alu (
@@ -123,7 +124,8 @@ r88_decoder decoder (
 	rightSel(rightSel),
 	breakFlag(breakFlag),
 	irqEn(irqEn),
-	aluResult(aluResult)
+	aluResult(aluResult),
+	incPC(incPC)
 };
 
 endmodule

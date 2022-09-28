@@ -23,7 +23,8 @@ module r88_regblock (
 	input 	carryIn,
 	input		decMode,
 	input		breakFlag,
-	input		irqEn
+	input		irqEn,
+	input    incPC
 };
 
 // Accumulator
@@ -108,6 +109,7 @@ always @ sysClock begin
 			endcase
 		end
 	end
+	else if (incPC) r_PC <= r_PC + 1;
 	
 	case (regRightSel)
 		2'd1: r_regRight <= r_A;

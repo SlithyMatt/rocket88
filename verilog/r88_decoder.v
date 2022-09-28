@@ -32,7 +32,8 @@ module r88_decoder (
 	output		rightSel,
 	output		breakFlag,
 	output		irqEn,
-	output		aluResult
+	output		aluResult,
+	output 		incPC
 );
 
 reg szOutEn = 0;					// sign/zero out enable
