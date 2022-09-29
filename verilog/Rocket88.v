@@ -15,7 +15,7 @@ module Rocket88 (
 
 wire [7:0] intD;				// internal data bus
 wire [7:0] highOut;			// ALU output high byte
-wire mc_write_full;			// write full address to memory controller
+wire mc_use_regAddr;			// route regAddr to address bus
 wire mc_write_low;			// write low byte of address to memory controller
 wire mc_write_high;			// write high byte of address to memory controller
 wire [15:0] regAddr;			// address register value
@@ -49,7 +49,7 @@ r88_mc memory_controller (
 	readMem(readMem),
 	writeMem(writeMem),
 	intD(intD),
-	mc_write_full(mc_write_full),
+	mc_use_regAddr(mc_use_regAddr),
 	mc_write_low(mc_write_low),
 	mc_write_high(mc_write_high),
 	regAddr(regAddr)

@@ -10,7 +10,7 @@ module r88_mc (
 	input readMem,
 	input writeMem,
 	inout [7:0] intD,
-	input mc_write_full,
+	input mc_use_regAddr,
 	input mc_write_low,
 	input mc_write_high,
 	input [15:0] regAddr
@@ -22,12 +22,11 @@ assign intD = readMem? extD : 8'Z;
 
 // External address bus register
 reg [15:0] r_extA;
-assign extA = r_extA;
+assign extA = mc_use_regAddr? regAddr : r_extA;
 
 // Update address bus every clock edge
 always @ edge sysClock begin
-	if mc_write_full r_extA <= regAddr;
-	else if mc_write_low r_extA[7:0] <= intD;
+	if mc_write_low r_extA[7:0] <= intD;
 	else if mc_write_high r_extA[15:8] <= intD;
 end
 
