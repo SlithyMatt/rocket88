@@ -40,6 +40,7 @@ wire rightSel;					// right value select (regLeft/intD)
 wire breakFlag;				// break flag
 wire irqEn;						// IRQ enable
 wire aluResult;				// put ALU result on internal data bus
+wire loadResult;				// disable ALU operation and load last ALU result
 wire incPC;						// increment the Program Counter
 
 r88_mc memory_controller (
@@ -125,7 +126,7 @@ r88_decoder decoder (
 	breakFlag(breakFlag),
 	irqEn(irqEn),
 	aluResult(aluResult),
-	incPC(incPC)
+	loadResult(loadResult)
 };
 
 endmodule
