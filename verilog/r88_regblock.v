@@ -31,17 +31,17 @@ module r88_regblock (
 reg [7:0] r_A = 8'h00;
 
 // General Purpose Registers
-reg [7:0] r_B = 8'h00;
-reg [7:0] r_C = 8'h00;
+reg [7:0] r_B = 8'hFF;
+reg [7:0] r_C = 8'hFE;
 
 // Auxiliary Address Register
-reg [15:0] r_DD = 16'h0000;
+reg [15:0] r_DD = 16'hFFFD;
 
 // Long Index Register
 reg [15:0] r_EE = 16'h0000;
 
 // Program Counter
-reg [15:0] r_PC = 16'hFFFE;
+reg [15:0] r_PC = 16'h0000;
 
 // Stack Pointer
 reg [15:0] r_SP = 16'hFFF9;
