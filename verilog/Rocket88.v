@@ -104,7 +104,7 @@ r88_decoder decoder (
 	resetReq(resetReq),
 	nmiReq(nmiReq),
 	irq(irq),
-	mc_write_full(mc_write_full),
+	mc_use_regAddr(mc_use_regAddr),
 	mc_write_low(mc_write_low),
 	mc_write_high(mc_write_high),
 	aluOp(aluOp),
@@ -126,7 +126,8 @@ r88_decoder decoder (
 	breakFlag(breakFlag),
 	irqEn(irqEn),
 	aluResult(aluResult),
-	loadResult(loadResult)
+	loadResult(loadResult),
+	incPC(incPC)
 };
 
 endmodule

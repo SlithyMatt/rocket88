@@ -19,7 +19,7 @@ module r88_regblock (
 	output 	[7:0] regLeft,
 	input 	szOutEn,
 	output 	signFlag,
-	output 	zeroFlag
+	output 	zeroFlag,
 	input 	carryIn,
 	input		decMode,
 	input		breakFlag,
