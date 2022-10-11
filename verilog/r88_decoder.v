@@ -46,10 +46,11 @@ reg r_breakFlag = 0;
 reg r_irqEn = 1;
 reg r_decMode = 0;
 reg r_regLeft16 = 0;
+wire extra_nop;
 
 // internal
-reg [7:0] r_opcode = 8'00h;
-reg [3:0] r_cycle = 4'0h;			// cycle within instruction
+reg [7:0] r_opcode = 8'h00;
+reg [3:0] r_cycle = 4'h0;			// cycle within instruction
 reg r_outputIntD = 0;
 reg r_init = 1;
 
@@ -59,15 +60,15 @@ reg r_writeMem = 0;
 reg r_mc_use_regAddr = 1;
 reg r_mc_write_low = 0;
 reg r_mc_write_high = 0;
-reg [2:0] r_aluOp = 3'000b;
-reg [1:0] r_regRightSel = 2'00b;
-reg [1:0] r_regLeftSel = 2'00b;
+reg [2:0] r_aluOp = 3'b000;
+reg [1:0] r_regRightSel = 2'b00;
+reg [1:0] r_regLeftSel = 2'b00;
 reg r_regLeft16 = 0;
-reg [1:0] r_regAddrSel = 2'00b;
+reg [1:0] r_regAddrSel = 2'b00;
 reg r_carryIn = 0;
 reg r_invOut = 0;
 reg r_carryInEn = 0;
-reg [3:0] r_regSel = 4'7h;
+reg [3:0] r_regSel = 4'h7;
 reg r_regWrite = 1;
 reg r_regRead = 0;
 reg r_rightSel = 0;
@@ -105,15 +106,15 @@ assign incPC = r_incPC;
 assign intD = r_outputIntD ? r_intD : 8'Z;
 
 always @ negedge sysClock begin
-	if (r_init and (r_cycle == 4'0h)) r_cycle <= 4'1h;
+	if (r_init and (r_cycle == 4'h0)) r_cycle <= 4'h1;
 end
 
 always @ posedge sysClock begin
-	if (r_init and (r_cycle == 4'1h)) begin
-		r_regSel = 4'8h;
+	if (r_init and (r_cycle == 4'h1)) begin
+		r_regSel = 4'h8;
 		r_regAddrSel = 1;
 		r_init = 0;
-		r_cycle = 4'0h;
+		r_cycle = 4'h0;
 	end
 end
 
@@ -142,14 +143,29 @@ always @ sysClock begin
 				r_incPC <= 0;
 				r_aluResult <= 0;
 				r_loadResult <= 0;
-				r_cycle <= 4'1h;			
+				r_cycle <= 4'h1;			
 			end
 			4'1h: begin
 				r_opcode = intD;
 				r_readMem = 0;				
 				r_incPC = 1;
-				// TODO check for single byte NOPs
-				r_cycle <= 4'2h
+				// check for single byte NOPs [so much room for expansion!]
+				if ((r_opcode[7:1] != 7'h02) and ((r_opcode[7:4] == 4'0) || 
+					(r_opcode == 8'h41) || (r_opcode == 8'h42) || (r_opcode == 8'h43) || (r_opcode == 8'h47) || 
+					(r_opcode == 8'h49) || (r_opcode == 8'h4A) || (r_opcode == 8'h4B) || (r_opcode == 8'h4F) || 
+					(r_opcode == 8'h51) || (r_opcode == 8'h52) || (r_opcode == 8'h53) || (r_opcode == 8'h57) || 
+					(r_opcode == 8'h59) || (r_opcode == 8'h5A) || (r_opcode == 8'h5B) || (r_opcode == 8'h5F) ||
+					(r_opcode == 8'h61) || (r_opcode == 8'h62) || (r_opcode == 8'h63) || (r_opcode == 8'h67) || 
+					(r_opcode == 8'h69) || (r_opcode == 8'h6A) || (r_opcode == 8'h6B) || (r_opcode == 8'h6F) || 
+					(r_opcode == 8'h71) || (r_opcode == 8'h72) || (r_opcode == 8'h73) || (r_opcode == 8'h77) || 
+					(r_opcode == 8'h79) || (r_opcode == 8'h7A) || (r_opcode == 8'h7B) || (r_opcode == 8'h7F) ||
+					(r_opcode == 8'hA0) || (r_opcode == 8'hA4) || (r_opcode == 8'hA8) || (r_opcode == 8'hAC) ||
+					(r_opcode == 8'hB0) || (r_opcode == 8'hB4) || (r_opcode == 8'hB8) || (r_opcode == 8'hBC)
+				)) r_cycle = 4'h0;
+				else r_cycle = 4'h2;
+			end
+			4'2: begin
+				// TODO check for NN addressing (x5, xC, F7)
 			end
 		endcase
 	end
