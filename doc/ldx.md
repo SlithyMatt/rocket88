@@ -12,16 +12,16 @@ lda #0
 Given an immediate operand with the value zero, the assembler should produce the Zero mode opcode, rather than the Immediate opcode followed by an explicit zero byte for an operand.
 
 ## Addressing Modes
-| Mode        | Opcode (hex) |
-|-------------|--------------|
-| Zero        | 10           |
-| A Register  | 11           |
-| B Register  | 12           |
-| C Register  | 13           |
-| Immediate   | 14           |
-| Absolute    | 15           |
-| BC Indirect | 16           |
-| DD Indirect | 50           |
+| Mode        | Opcode (hex) | Cycles |
+|-------------|--------------|--------|
+| Zero        | 10           | 2      |
+| A Register  | 11           | 2      |
+| B Register  | 12           | 2      |
+| C Register  | 13           | 2      |
+| Immediate   | 14           | 2      |
+| Absolute    | 15           | 4      |
+| BC Indirect | 16           | 2      |
+| DD Indirect | 50           | 2      |
 
 ## Register Effects
 A will contain value referenced by operand. No other registers affected.
@@ -55,15 +55,15 @@ lda $0102   ; A = 3
 Loads a value into the B register, based on the operand. Works the same as [LDA/LDAZ](#lda-ldaz) for the same addressing modes.
 
 ## Addressing Modes
-| Mode        | Opcode (hex) |
-|-------------|--------------|
-| Zero        | 20           |
-| A Register  | 21           |
-| B Register  | 22           |
-| C Register  | 23           |
-| Immediate   | 24           |
-| Absolute    | 25           |
-| BC Indirect | 26           |
+| Mode        | Opcode (hex) | Cycles |
+|-------------|--------------|--------|
+| Zero        | 20           | 2      |
+| A Register  | 21           | 2      |
+| B Register  | 22           | 2      |
+| C Register  | 23           | 2      |
+| Immediate   | 24           | 2      |
+| Absolute    | 25           | 4      |
+| BC Indirect | 26           | 2      |
 
 # LDC, LDCZ
 "LoaD C", "LoaD C with Zero"
@@ -72,15 +72,15 @@ Loads a value into the B register, based on the operand. Works the same as [LDA/
 Loads a value into the C register, based on the operand. Works the same as [LDA/LDAZ](#lda-ldaz) for the same addressing modes.
 
 ## Addressing Modes
-| Mode        | Opcode (hex) |
-|-------------|--------------|
-| Zero        | 30           |
-| A Register  | 31           |
-| B Register  | 32           |
-| C Register  | 33           |
-| Immediate   | 34           |
-| Absolute    | 35           |
-| BC Indirect | 36           |
+| Mode        | Opcode (hex) | Cycles |
+|-------------|--------------|--------|
+| Zero        | 30           | 2      |
+| A Register  | 31           | 2      |
+| B Register  | 32           | 2      |
+| C Register  | 33           | 2      |
+| Immediate   | 34           | 2      |
+| Absolute    | 35           | 4      |
+| BC Indirect | 36           | 2      |
 
 # LBCS
 "Load BC with Stack pointer"
@@ -89,9 +89,9 @@ Loads a value into the C register, based on the operand. Works the same as [LDA/
 Loads the address in the current SP into BC, with the high byte of the stack pointer going into B and the low byte into C. This is the only way to capture the value of the stack pointer, rather than fetching data from the stack.
 
 ## Addressing Modes
-| Mode     | Opcode (hex) |
-|----------|--------------|
-| Implicit | FB           |
+| Mode     | Opcode (hex) | Cycles |
+|----------|--------------|--------|
+| Implicit | FA           | 2      |
 
 ## Register Effects
 BC will contain the same address value as SP.
@@ -105,9 +105,9 @@ None - stack pointer will not change.
 ## Example
 This code sets the stack to a known address, pushes a byte to it, then loads the new stack pointer into BC.
 ```
-lds $1234   ; SP = 1234
-pha         ; SP = 1233; (1233) = A
-lbcs        ; B = 12; C = 33
+lds $1234   ; SP = $1234
+pha         ; SP = $1233; ($1233) = A
+lbcs        ; B = $12; C = $33
 ```
 
 # LDS
@@ -117,11 +117,11 @@ lbcs        ; B = 12; C = 33
 Loads the stack pointer with a new address. If this is a change from the current stack pointer, anything pushed to the old stack is lost unless the direct address was preserved elsewhere before. This should be one of the first instructions executed after powering on the processor to get the stack into a known and inobtrusive location.
 
 ## Addressing Modes
-| Mode        | Opcode (hex) |
-|-------------|--------------|
-| Absolute    | F7           |
-| BC Register | F8           |
-| BC Indirect | F9           |
+| Mode        | Opcode (hex) | Cycles |
+|-------------|--------------|--------|
+| Absolute    | F7           | 3      |
+| BC Register | F8           | 2      |
+| BC Indirect | F9           | 3      |
 
 ## Register Effects
 None

@@ -320,6 +320,12 @@ python3 tools/update_microcode_sheet.py verilog/sim/microcode.tsv Rocket88.ods
 
 Separate from this core project will be another project in another repository for the ROCKET88 reference computer. It will also be targeting the DE10 Nano, and in turn, the [MiSTer](http://www.mistercores.com/mister/), where it can be deployed alongside other retro system cores. Eventually, there will be forks of this reference computer that will target other development boards, providing a complete system for people to use on multiple hardware platforms.
 
+#### Instruction Documentation
+Every code example in the [doc](doc) directory is assembled and run on the Verilog core, checking comments such as `; A = $42, carry = 1` against the result, and every opcode in the docs' cycle tables is timed to check its cycle count (Icarus Verilog required). From the repository root:
+```
+python3 tools/check_doc_examples.py
+```
+
 ### Emulator Core Library
 The reference computer will also exist as a software emulator that can run on Linux, Mac or even Windows. Like the Verilog implementation, this repo will contain only the code for the core emulation, which will be compiled into a library that can be linked into the reference computer emulator, or even into a different emulator.
 
