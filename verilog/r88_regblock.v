@@ -2,6 +2,10 @@
 // Module: r88_regblock
 // Description: Register Block
 // See https://github.com/SlithyMatt/rocket88 for current code and documentation
+//
+// Timing: register outputs (regRight, regLeft, regAddr, intD) are combinational
+// from the current select lines, so they are valid within the same microcode
+// step. Register writes are latched at the end of the step (posedge sysClock).
 
 module r88_regblock (
 	input 	sysClock,
@@ -14,28 +18,43 @@ module r88_regblock (
 	input    [1:0] regAddrSel,
 	input 	regWrite,
 	input 	regRead,
-	output	[15:0] regAddr,
-	output 	[7:0] regRight,
-	output 	[7:0] regLeft,
-	input 	szOutEn,
-	output 	signFlag,
-	output 	zeroFlag,
+	output	reg [15:0] regAddr,
+	output 	reg [7:0] regRight,
+	output 	reg [15:0] regLeft,
+	input 	signFlag,
+	input 	zeroFlag,
 	input 	carryIn,
 	input		decMode,
 	input		breakFlag,
 	input		irqEn,
 	input    incPC
-};
+);
+
+// regSel values
+localparam REG_A   = 4'd0;
+localparam REG_B   = 4'd1;
+localparam REG_C   = 4'd2;
+localparam REG_DDL = 4'd3;
+localparam REG_DDH = 4'd4;
+localparam REG_EEL = 4'd5;
+localparam REG_EEH = 4'd6;
+localparam REG_PCL = 4'd7;
+localparam REG_PCH = 4'd8;
+localparam REG_SPL = 4'd9;
+localparam REG_SPH = 4'd10;
+localparam REG_P   = 4'd11;
 
 // Accumulator
 reg [7:0] r_A = 8'h00;
 
 // General Purpose Registers
+// BC powers on as $FFFE (RESET vector low byte), used by the Init microcode
 reg [7:0] r_B = 8'hFF;
 reg [7:0] r_C = 8'hFE;
 
 // Auxiliary Address Register
-reg [15:0] r_DD = 16'hFFFD;
+// DD powers on as $FFFF (RESET vector high byte), used by the Init microcode
+reg [15:0] r_DD = 16'hFFFF;
 
 // Long Index Register
 reg [15:0] r_EE = 16'h0000;
@@ -46,106 +65,101 @@ reg [15:0] r_PC = 16'h0000;
 // Stack Pointer
 reg [15:0] r_SP = 16'hFFF9;
 
-// Output Buffers
-reg [7:0] r_regRight = 8'h00;
-reg [7:0] r_regLeft = 8'h00;
-reg [15:0] r_regAddr = 8'h00;
-reg [7:0] r_intD = 8'h00;
+// Processor status as seen on the bus: S Z C I D K - -
+// (I is Interrupt *Disable*, so it is the inverse of irqEn)
+wire [7:0] w_P = {signFlag, zeroFlag, carryIn, ~irqEn, decMode, breakFlag, 2'b00};
 
-assign regRight = r_regRight;
-assign regLeft = r_regLeft;
-assign regAddr = r_regAddr;
-assign intD = regRead? r_intD : 8'Z;
+// Register read onto internal data bus
+reg [7:0] r_intD;
+assign intD = regRead ? r_intD : 8'bz;
 
-// Update outputs every clock edge
-always @ sysClock begin
-	if regRead begin
-		case (regSel)
-			3'd0: r_intD <= r_A;
-			3'd1: r_intD <= r_B;
-			3'd2: r_intD <= r_C;
-			3'd3: r_intD <= r_DD[7:0];
-			3'd4: r_intD <= r_DD[15:8];
-			3'd5: r_intD <= r_EE[7:0];
-			3'd6: r_intD <= r_EE[15:8];
-			3'd7: r_intD <= r_PC[7:0];
-			3'd8: r_intD <= r_PC[15:8];
-			3'd9: r_intD <= r_SP[7:0];
-			3'd10: r_intD <= r_SP[15:8];
-			3'd11: begin
-					r_intD[1:0] <= 2'b00;
-					r_intD[2] <= breakFlag;
-					r_intD[3] <= decMode;
-					r_intD[4] <= irqEn;
-					r_intD[5] <= carryIn;
-					r_intD[6] <= zeroFlag;
-					r_intD[7] <= signFlag;
-				end
-			default: r_intD <= 8'h00;
+always @(*) begin
+	case (regSel)
+		REG_A:   r_intD = r_A;
+		REG_B:   r_intD = r_B;
+		REG_C:   r_intD = r_C;
+		REG_DDL: r_intD = r_DD[7:0];
+		REG_DDH: r_intD = r_DD[15:8];
+		REG_EEL: r_intD = r_EE[7:0];
+		REG_EEH: r_intD = r_EE[15:8];
+		REG_PCL: r_intD = r_PC[7:0];
+		REG_PCH: r_intD = r_PC[15:8];
+		REG_SPL: r_intD = r_SP[7:0];
+		REG_SPH: r_intD = r_SP[15:8];
+		REG_P:   r_intD = w_P;
+		default: r_intD = 8'h00;
+	endcase
+end
+
+// ALU right operand (8-bit)
+always @(*) begin
+	case (regRightSel)
+		2'd1: regRight = r_A;
+		2'd2: regRight = r_B;
+		2'd3: regRight = r_C;
+		default: regRight = 8'h00;
+	endcase
+end
+
+// ALU left operand (8-bit or 16-bit)
+always @(*) begin
+	if (regLeft16) begin
+		case (regLeftSel)
+			2'd0: regLeft = r_DD;
+			2'd1: regLeft = r_EE;
+			2'd2: regLeft = r_PC;
+			default: regLeft = r_SP;
 		endcase
 	end
-	else if regWrite begin
-		case (regSel)
-			3'd0: r_A <= intD;
-			3'd1: r_B <= intD;
-			3'd2: r_C <= intD;
-			3'd3: r_DD[7:0] <= intD;
-			3'd4: r_DD[15:8] <= intD;
-			3'd5: r_EE[7:0] <= intD;
-			3'd6: r_EE[15:8] <= intD;
-			3'd7: r_PC[7:0] <= intD;
-			3'd8: r_PC[15:8] <= intD;
-			3'd9: r_SP[7:0] <= intD;
-			3'd10: r_SP[15:8] <= intD;
-			default: ; // do nothing
+	else begin
+		case (regLeftSel)
+			2'd1: regLeft = {8'h00, r_A};
+			2'd2: regLeft = {8'h00, r_B};
+			2'd3: regLeft = {8'h00, r_C};
+			default: regLeft = 16'h0000;
 		endcase
+	end
+end
+
+// Memory controller address source
+always @(*) begin
+	case (regAddrSel)
+		2'd0: regAddr = {r_B, r_C};
+		2'd1: regAddr = r_DD;
+		2'd2: regAddr = r_PC;
+		default: regAddr = r_SP;
+	endcase
+end
+
+// Register writes, latched at end of step
+always @(posedge sysClock) begin
+	if (regWrite) begin
+		case (regSel)
+			REG_A:   r_A <= intD;
+			REG_B:   r_B <= intD;
+			REG_C:   r_C <= intD;
+			REG_DDL: r_DD[7:0] <= intD;
+			REG_DDH: r_DD[15:8] <= intD;
+			REG_EEL: r_EE[7:0] <= intD;
+			REG_EEH: r_EE[15:8] <= intD;
+			REG_PCL: r_PC[7:0] <= intD;
+			REG_PCH: r_PC[15:8] <= intD;
+			REG_SPL: r_SP[7:0] <= intD;
+			REG_SPH: r_SP[15:8] <= intD;
+			default: ; // P lives in the decoder
+		endcase
+		// 16-bit write: low byte from intD (above), high byte from ALU highOut
 		if (regLeft16) begin
 			case (regSel)
-				3'd3: r_DD[15:8] <= highOut;
-				3'd5: r_EE[15:8] <= highOut;
-				3'd7: r_PC[15:8] <= highOut;
-				3'd9: r_SP[15:8] <= highOut;
+				REG_DDL: r_DD[15:8] <= highOut;
+				REG_EEL: r_EE[15:8] <= highOut;
+				REG_PCL: r_PC[15:8] <= highOut;
+				REG_SPL: r_SP[15:8] <= highOut;
 				default: ; // do nothing
 			endcase
 		end
 	end
-	else if (incPC) r_PC <= r_PC + 1;
-	
-	case (regRightSel)
-		2'd1: r_regRight <= r_A;
-		2'd2: r_regRight <= r_B;
-		2'd3: r_regRight <= r_C;
-		default: r_regRight <= 8'h00;
-	endcase
-	
-	if (regLeft16) begin
-		case (regLeftSel)		
-			2'd0: r_regLeft <= r_DD;
-			2'd1: r_regLeft <= r_EE;
-			2'd2: r_regLeft <= r_PC;
-			2'd3: r_regLeft <= r_SP;
-		endcase
-	else begin
-		r_regLeft[15:8] <= 8'h00;
-		case (regLeftSel)		
-			2'd0: r_regLeft[7:0] <= 8'h00;
-			2'd1: r_regLeft[7:0] <= r_A;
-			2'd2: r_regLeft[7:0] <= r_B;
-			2'd3: r_regLeft[7:0] <= r_C;
-		endcase
-	end
-			
-	case (regAddrSel)
-		2'd0: begin
-				r_regAddr[15:8] <= r_B;
-				r_regAddr[7:0] <= r_C;
-			end
-		2'd1: r_regAddr <= r_DD;
-		2'd2: r_regAddr <= r_PC;
-		2'd3: r_regAddr <= r_SP;
-	endcase
-	
+	else if (incPC) r_PC <= r_PC + 16'd1;
 end
-
 
 endmodule

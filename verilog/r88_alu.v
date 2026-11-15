@@ -2,6 +2,19 @@
 // Module: r88_alu
 // Description: Arithmetic-Logic Unit
 // See https://github.com/SlithyMatt/rocket88 for current code and documentation
+//
+// Timing: the result is combinational from the current inputs, so it can be
+// driven onto intD (aluResult) in the same microcode step it is computed.
+// At the end of every step without loadResult, the result is also latched.
+// With loadResult set, the latched result is output instead of computing,
+// so a result can be computed in one step and written back in a later one
+// (e.g. SP +/- 1 while SP itself is the left operand).
+//
+// Never set rightSel and aluResult together without loadResult: the ALU would
+// then be driving the same bus it is reading from.
+//
+// Carry convention: for subtraction, carry = NOT borrow (C set when
+// left >= right), which matches the compare definition in the README.
 
 module r88_alu(
  	input sysClock,
@@ -13,6 +26,8 @@ module r88_alu(
 	input [2:0] aluOp,
 	input carryIn,
 	output carryOut,
+	output signOut,			// sign of (possibly latched) 8-bit result
+	output zeroOut,			// zero of (possibly latched) 8-bit result
 	input invOut,
 	input decMode,
 	input carryInEn,
@@ -21,98 +36,125 @@ module r88_alu(
 	input loadResult
 );
 
-wire [7:0] w_output = 8'h00;
-reg [7:0] r_output = 8'h00;
-reg r_carryOut = 0;
-reg [7:0] r_highOut = 8'h00;
-reg r_carrySink;
+localparam ALU_PASS = 3'd0;
+localparam ALU_SHL  = 3'd1;
+localparam ALU_SHR  = 3'd2;
+localparam ALU_ADD  = 3'd3;
+localparam ALU_SUB  = 3'd4;
+localparam ALU_OR   = 3'd5;
+localparam ALU_AND  = 3'd6;
+localparam ALU_XOR  = 3'd7;
 
-assign intD = aluResult? (invOut? ~w_output : w_output) : 8'Z;
-assign carryOut = r_carryOut;
+wire [7:0] w_right = rightSel ? intD : regRight;
 
-wire [7:0] r_rightOperand;
-assign r_rightOperand = rightSel? intD : regRight;
+// Combinational result
+reg [7:0] c_low;
+reg [7:0] c_high;
+reg c_carry;
 
-assign highOut = r_highOut;
+// Scratch for arithmetic
+reg [16:0] t_sum16;
+reg [8:0] t_sum8;
+reg [4:0] t_lo;
+reg [4:0] t_hi;
+reg t_cin;
+reg t_borrowLo;
+reg t_borrowHi;
 
-always @ sysClock begin
-	if loadResult begin
-		w_output <= r_output;
-	end
-	else begin
-		case (aluOp)
-			3'd0: s_output <= r_rightOperand; // pass through
-			3'd1: begin // shift left
-				w_output[0] <= carryInEn? carryIn : 0;
-				w_output[1] <= r_rightOperand[0];
-				w_output[2] <= r_rightOperand[1];
-				w_output[3] <= r_rightOperand[2];
-				w_output[4] <= r_rightOperand[3];
-				w_output[5] <= r_rightOperand[4];
-				w_output[6] <= r_rightOperand[5];
-				w_output[7] <= r_rightOperand[6];
-				r_carryOut <= r_rightOperand[7];
-				end
-			3'd2: begin // shift right
-				w_output[0] <= r_rightOperand[1];
-				w_output[1] <= r_rightOperand[2];
-				w_output[2] <= r_rightOperand[3];
-				w_output[3] <= r_rightOperand[4];
-				w_output[4] <= r_rightOperand[5];
-				w_output[5] <= r_rightOperand[6];
-				w_output[6] <= r_rightOperand[7];
-				w_output[7] <= carryInEn? carryIn : 0;
-				r_carryOut <= regRight[0];
-				end
-			3'd3: begin // add
-					if (regLeft16)
-						{r_carrySink, r_highOut, w_output} = regLeft + r_rightOperand;			
-					else begin
-						if (decMode) begin
-							{r_carrySink, w_output[3:0]} = regLeft[3:0] + r_rightOperand[3:0] + carryInEn? carryIn : 0;
-							if (r_carrySink or w_output[3:0] > 9) begin
-								w_output[3:0] = w_output[3:0] + 6;
-								r_carrySink = 1;
-							end
-							{r_carryOut, w_output[7:4]} = regLeft[7:4] + r_rightOperand[7:4] + r_carrySink;
-							if (r_carryOut or w_output[7:4] > 9) begin
-								w_output[7:4] = w_output[7:4] + 6;
-								r_carryOut = 1;
-							end
-						end
-						else
-							{r_carryOut, w_output} = regLeft[7:0] + r_rightOperand + carryInEn? carryIn : 0;
-					end
-				end
-			3'd4: begin // subtract
-					if (regLeft16)
-						{r_highOut, w_output} <= regLeft - r_rightOperand;
-					else begin
-						if (decMode) begin
-							{r_carrySink, w_output[3:0]} = {1'b1,regLeft[3:0]} - r_rightOperand[3:0] - carryInEn? carryIn : 0;
-							if (!r_carrySink) begin
-								w_output[3:0] = w_output[3:0] - 6;
-								r_carrySink = 1;
-							end
-							else
-								r_carrySink = 0;
-							{r_carryOut, w_output[7:4]} = {1'b1,regLeft[7:4]} - r_rightOperand[7:4] - r_carrySink;
-							if (!r_carryOut) begin
-								w_output[7:4] = w_output[7:4] - 6;
-								r_carryOut = 1;
-							end
-							else
-								r_carryOut = 0;
-						end					
-						else
-							{r_carryOut, w_output} <= regLeft[7:0] + ~({r_rightOperand[7],r_rightOperand} + carryInEn? carryIn : 0) + 1;
-				end
-			3'd5: w_output <= regLeft[7:0] | r_rightOperand; // or
-			3'd6: w_output <= regLeft[7:0] & r_rightOperand; // and
-			3'd7: w_output <= regLeft[7:0] ^ r_rightOperand; // exclusive or
-		endcase
-		r_output <= w_output;
+always @(*) begin
+	c_low = 8'h00;
+	c_high = 8'h00;
+	c_carry = carryIn;		// unchanged unless operation produces a carry
+	t_sum16 = 17'h0;
+	t_sum8 = 9'h0;
+	t_lo = 5'h0;
+	t_hi = 5'h0;
+	t_cin = 1'b0;
+	t_borrowLo = 1'b0;
+	t_borrowHi = 1'b0;
+
+	case (aluOp)
+		ALU_PASS: c_low = w_right;
+		ALU_SHL: begin
+			c_low = {w_right[6:0], carryInEn & carryIn};
+			c_carry = w_right[7];
+		end
+		ALU_SHR: begin
+			c_low = {carryInEn & carryIn, w_right[7:1]};
+			c_carry = w_right[0];
+		end
+		ALU_ADD: begin
+			t_cin = carryInEn & carryIn;
+			if (regLeft16) begin
+				t_sum16 = {1'b0, regLeft} + {9'h000, w_right};
+				{c_high, c_low} = t_sum16[15:0];
+				c_carry = t_sum16[16];
+			end
+			else if (decMode) begin
+				t_lo = {1'b0, regLeft[3:0]} + {1'b0, w_right[3:0]} + {4'h0, t_cin};
+				if (t_lo > 5'd9) t_lo = t_lo + 5'd6;
+				t_hi = {1'b0, regLeft[7:4]} + {1'b0, w_right[7:4]} + {4'h0, t_lo[4]};
+				if (t_hi > 5'd9) t_hi = t_hi + 5'd6;
+				c_low = {t_hi[3:0], t_lo[3:0]};
+				c_carry = t_hi[4];
+			end
+			else begin
+				t_sum8 = {1'b0, regLeft[7:0]} + {1'b0, w_right} + {8'h00, t_cin};
+				c_low = t_sum8[7:0];
+				c_carry = t_sum8[8];
+			end
+		end
+		ALU_SUB: begin
+			// carry in of 1 = no borrow; plain SUB/compare (carryInEn=0) never borrows in
+			t_cin = carryInEn ? carryIn : 1'b1;
+			if (regLeft16) begin
+				t_sum16 = {1'b0, regLeft} - {9'h000, w_right};
+				{c_high, c_low} = t_sum16[15:0];
+				c_carry = ~t_sum16[16];
+			end
+			else if (decMode) begin
+				t_lo = {1'b0, regLeft[3:0]} - {1'b0, w_right[3:0]} - {4'h0, ~t_cin};
+				t_borrowLo = t_lo[4];
+				if (t_borrowLo) t_lo = t_lo - 5'd6;
+				t_hi = {1'b0, regLeft[7:4]} - {1'b0, w_right[7:4]} - {4'h0, t_borrowLo};
+				t_borrowHi = t_hi[4];
+				if (t_borrowHi) t_hi = t_hi - 5'd6;
+				c_low = {t_hi[3:0], t_lo[3:0]};
+				c_carry = ~t_borrowHi;
+			end
+			else begin
+				t_sum8 = {1'b0, regLeft[7:0]} + {1'b0, ~w_right} + {8'h00, t_cin};
+				c_low = t_sum8[7:0];
+				c_carry = t_sum8[8];
+			end
+		end
+		ALU_OR:  c_low = regLeft[7:0] | w_right;
+		ALU_AND: c_low = regLeft[7:0] & w_right;
+		ALU_XOR: c_low = regLeft[7:0] ^ w_right;
+	endcase
+end
+
+wire [7:0] w_result = invOut ? ~c_low : c_low;
+
+// Latched result
+reg [7:0] r_low = 8'h00;
+reg [7:0] r_high = 8'h00;
+reg r_carry = 1'b0;
+
+always @(posedge sysClock) begin
+	if (!loadResult) begin
+		r_low <= w_result;
+		r_high <= c_high;
+		r_carry <= c_carry;
 	end
 end
+
+wire [7:0] w_out = loadResult ? r_low : w_result;
+
+assign intD = aluResult ? w_out : 8'bz;
+assign highOut = loadResult ? r_high : c_high;
+assign carryOut = loadResult ? r_carry : c_carry;
+assign signOut = w_out[7];
+assign zeroOut = (w_out == 8'h00);
 
 endmodule

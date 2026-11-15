@@ -2,6 +2,10 @@
 // Module: Rocket88
 // Description: Top-Level of Core
 // See https://github.com/SlithyMatt/rocket88 for current code and documentation
+//
+// Each rising edge of sysClock is one microcode step (one row of the
+// Microcode sheet in Rocket88.ods), so sysClock runs at twice the rate of a
+// full n/p cycle.
 module Rocket88 (
 	inout 	[7:0] extD, 	// external data bus
 	output	readMem,			// read memory request
@@ -23,11 +27,13 @@ wire [7:0] regRight;			// right register value
 wire [15:0] regLeft;			// left register value
 wire [2:0] aluOp;				// arithmetic logic unit (ALU) operation
 wire [1:0] regRightSel;		// right register selection
-wire [2:0] regLeftSel;		// left register selection
+wire [1:0] regLeftSel;		// left register selection
 wire regLeft16;				// left register 16-bits
 wire [1:0] regAddrSel;		// address register selection
-wire carryIn;					// carry input value
-wire carryOut;					// carry output value
+wire carryIn;					// carry flag value
+wire carryOut;					// ALU carry output value
+wire aluSign;					// ALU result sign
+wire aluZero;					// ALU result zero
 wire invOut;					// invert ALU output
 wire decMode;					// decimal mode
 wire carryInEn;				// carry in enable
@@ -36,7 +42,7 @@ wire regWrite;					// write to register
 wire regRead;					// read from register
 wire signFlag;					// sign flag
 wire zeroFlag;					// zero flag
-wire rightSel;					// right value select (regLeft/intD)
+wire rightSel;					// right value select (regRight/intD)
 wire breakFlag;				// break flag
 wire irqEn;						// IRQ enable
 wire aluResult;				// put ALU result on internal data bus
@@ -44,90 +50,95 @@ wire loadResult;				// disable ALU operation and load last ALU result
 wire incPC;						// increment the Program Counter
 
 r88_mc memory_controller (
-	sysClock(sysClock),
-	extA(extA),
-	extD(extD),
-	readMem(readMem),
-	writeMem(writeMem),
-	intD(intD),
-	mc_use_regAddr(mc_use_regAddr),
-	mc_write_low(mc_write_low),
-	mc_write_high(mc_write_high),
-	regAddr(regAddr)
+	.sysClock(sysClock),
+	.extA(extA),
+	.extD(extD),
+	.readMem(readMem),
+	.writeMem(writeMem),
+	.intD(intD),
+	.mc_use_regAddr(mc_use_regAddr),
+	.mc_write_low(mc_write_low),
+	.mc_write_high(mc_write_high),
+	.regAddr(regAddr)
 );
 
 r88_regblock registers (
-	sysClock(sysClock),
-	intD(intD),
-	highOut(highOut),
-	regSel(regSel),
-	regRightSel(regRightSel),
-	regLeftSel(regLeftSel),
-	regLeft16(regLeft16),
-	regAddrSel(regAddrSel),
-	regWrite(regWrite),
-	regRead(regRead),
-	regAddr(regAddr),
-	regRight(regRight),
-	regLeft(regLeft),
-	signFlag(signFlag),
-	zeroFlag(zeroFlag),
-	carryIn(carryIn),
-	decMode(decMode),
-	breakFlag(breakFlag),
-	irqEn(irqEn),
-	incPC(incPC)
-};
+	.sysClock(sysClock),
+	.intD(intD),
+	.highOut(highOut),
+	.regSel(regSel),
+	.regRightSel(regRightSel),
+	.regLeftSel(regLeftSel),
+	.regLeft16(regLeft16),
+	.regAddrSel(regAddrSel),
+	.regWrite(regWrite),
+	.regRead(regRead),
+	.regAddr(regAddr),
+	.regRight(regRight),
+	.regLeft(regLeft),
+	.signFlag(signFlag),
+	.zeroFlag(zeroFlag),
+	.carryIn(carryIn),
+	.decMode(decMode),
+	.breakFlag(breakFlag),
+	.irqEn(irqEn),
+	.incPC(incPC)
+);
 
 r88_alu alu (
-	sysClock(sysClock),
-	intD(intD),
-	highOut(highOut),
-	regRight(regRight),
-	regLeft(regLeft),
-	regLeft16(regLeft16),
-	aluOp(aluOp),
-	carryIn(carryIn),
-	carryOut(carryOut),
-	invOut(invOut),
-	decMode(decMode),
-	carryInEn(carryInEn),
-	rightSel(rightSel),
-	aluResult(aluResult)
+	.sysClock(sysClock),
+	.intD(intD),
+	.highOut(highOut),
+	.regRight(regRight),
+	.regLeft(regLeft),
+	.regLeft16(regLeft16),
+	.aluOp(aluOp),
+	.carryIn(carryIn),
+	.carryOut(carryOut),
+	.signOut(aluSign),
+	.zeroOut(aluZero),
+	.invOut(invOut),
+	.decMode(decMode),
+	.carryInEn(carryInEn),
+	.rightSel(rightSel),
+	.aluResult(aluResult),
+	.loadResult(loadResult)
 );
 
 r88_decoder decoder (
-	sysClock(sysClock),
-	readMem(readMem),
-	writeMem(writeMem),
-	intD(intD),
-	resetReq(resetReq),
-	nmiReq(nmiReq),
-	irq(irq),
-	mc_use_regAddr(mc_use_regAddr),
-	mc_write_low(mc_write_low),
-	mc_write_high(mc_write_high),
-	aluOp(aluOp),
-	regRightSel(regRightSel),
-	regLeftSel(regLeftSel),
-	regLeft16(regLeft16),
-	regAddrSel(regAddrSel),
-	carryIn(carryIn),
-	carryOut(carryOut),
-	invOut(invOut),
-	decMode(decMode),
-	carryInEn(carryInEn),
-	regSel(regSel),
-	regWrite(regWrite),
-	regRead(regRead),
-	signFlag(signFlag),
-	zeroFlag(zeroFlag),
-	rightSel(rightSel),
-	breakFlag(breakFlag),
-	irqEn(irqEn),
-	aluResult(aluResult),
-	loadResult(loadResult),
-	incPC(incPC)
-};
+	.sysClock(sysClock),
+	.readMem(readMem),
+	.writeMem(writeMem),
+	.intD(intD),
+	.resetReq(resetReq),
+	.nmiReq(nmiReq),
+	.irq(irq),
+	.mc_use_regAddr(mc_use_regAddr),
+	.mc_write_low(mc_write_low),
+	.mc_write_high(mc_write_high),
+	.aluOp(aluOp),
+	.regRightSel(regRightSel),
+	.regLeftSel(regLeftSel),
+	.regLeft16(regLeft16),
+	.regAddrSel(regAddrSel),
+	.carryIn(carryIn),
+	.carryOut(carryOut),
+	.aluSign(aluSign),
+	.aluZero(aluZero),
+	.invOut(invOut),
+	.decMode(decMode),
+	.carryInEn(carryInEn),
+	.regSel(regSel),
+	.regWrite(regWrite),
+	.regRead(regRead),
+	.signFlag(signFlag),
+	.zeroFlag(zeroFlag),
+	.rightSel(rightSel),
+	.breakFlag(breakFlag),
+	.irqEn(irqEn),
+	.aluResult(aluResult),
+	.loadResult(loadResult),
+	.incPC(incPC)
+);
 
 endmodule

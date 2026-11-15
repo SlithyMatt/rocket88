@@ -17,17 +17,17 @@ module r88_mc (
 );
 
 // Data bus tri-state buffers
-assign extD = writeMem? intD : 8'Z;
-assign intD = readMem? extD : 8'Z;
+assign extD = writeMem ? intD : 8'bz;
+assign intD = readMem ? extD : 8'bz;
 
 // External address bus register
-reg [15:0] r_extA;
-assign extA = mc_use_regAddr? regAddr : r_extA;
+reg [15:0] r_extA = 16'h0000;
+assign extA = mc_use_regAddr ? regAddr : r_extA;
 
-// Update address bus every clock edge
-always @ edge sysClock begin
-	if mc_write_low r_extA[7:0] <= intD;
-	else if mc_write_high r_extA[15:8] <= intD;
+// Latch address bytes from the internal data bus at the end of the step
+always @(posedge sysClock) begin
+	if (mc_write_low) r_extA[7:0] <= intD;
+	if (mc_write_high) r_extA[15:8] <= intD;
 end
 
 endmodule

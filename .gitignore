@@ -134,3 +134,7 @@ dmypy.json
 db/
 *.qns
 *.sci
+
+# Icarus Verilog simulation output
+*.vvp
+*.vcd
