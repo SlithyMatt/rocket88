@@ -56,7 +56,7 @@ stb $ABCD   ; ($ABCD) = $12
 "STore C"
 
 ## Behavior
-Same as STA, but stores the value in the C register. The BC Indirect addressing mode means that the value in B will also be the low byte of the memory address written to. Because of this limitation, the Absolute mode is the only widely practical mode.
+Same as STA, but stores the value in the C register. The BC Indirect addressing mode means that the value in C will also be the low byte of the memory address written to. Because of this limitation, the Absolute mode is the only widely practical mode.
 
 ## Addressing Modes
 | Mode        | Opcode (hex) |
@@ -68,8 +68,8 @@ Same as STA, but stores the value in the C register. The BC Indirect addressing 
 The following code stores the value in C to two different addresses: $1234 and $ABCD. Both addressing modes are used.
 
 ```
-ldb #$12    
+ldb #$12
 ldc #$34    ; C = $34
-stb (bc)    ; ($1234) = $34
-stb $ABCD   ; ($ABCD) = $34
+stc (bc)    ; ($1234) = $34
+stc $ABCD   ; ($ABCD) = $34
 ```

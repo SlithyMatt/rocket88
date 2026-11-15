@@ -21,7 +21,7 @@
 * [CPB](cpx.md#cpb-cpbz)
    * [CPBZ](cpx.md#cpb-cpbz)
 * [CPC](cpx.md#cpc-cpcz)
-   * [CPBZ](cpx.md#cpc-cpcz)
+   * [CPCZ](cpx.md#cpc-cpcz)
 
 ## Stack
 * [PHA](phx.md#pha)

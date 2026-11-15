@@ -106,7 +106,7 @@ None - stack pointer will not change.
 This code sets the stack to a known address, pushes a byte to it, then loads the new stack pointer into BC.
 ```
 lds $1234   ; SP = 1234
-pha         ; (1234) = A; SP = 1233
+pha         ; SP = 1233; (1233) = A
 lbcs        ; B = 12; C = 33
 ```
 
@@ -133,18 +133,16 @@ None
 Stack will be moved to a new address based on the operand.
 
 ## Example
-In this code, the stack is initialized to $0FFF. Then a new address ($1234) is pushed onto the stack, moving the stack pointer to $0FFD. This new stack pointer is loaded into BC for preservation. BC is incremented, and then the address that was pushed ($1234) is made into the new stack pointer by fetching it from the address in BC. Then the old stack location is restored by decrementing BC and loading that value back into the stack pointer. Clearing that address from the stack makes it empty again and brings the stack pointer back to $0FFF again.
+In this code, the stack is initialized to $1000, so that the first byte pushed goes to $0FFF (a push decrements SP, then writes to the new address). Then a new address ($1234) is pushed onto the stack, high byte first, moving the stack pointer to $0FFE. This new stack pointer is loaded into BC for preservation. Then the address that was pushed ($1234) is made into the new stack pointer by fetching it from the address in BC, low byte first. Then the old stack location is restored by loading BC back into the stack pointer. Clearing that address from the stack makes it empty again and brings the stack pointer back to $1000 again.
 ```
-lds $0FFF   ; SP = $0FFF
+lds $1000   ; SP = $1000
 lda #$12    ; A = $12
-pha         ; SP = $0FFE, ($0FFF) = $12
+pha         ; SP = $0FFF, ($0FFF) = $12
 lda #$34    ; A = $34
-pha         ; SP = $0FFD, ($0FFE) = $34
-lbcs        ; BC = $0FFD
-inc bc      ; BC = $0FFE
+pha         ; SP = $0FFE, ($0FFE) = $34
+lbcs        ; BC = $0FFE
 lds (bc)    ; SP = $1234
-dec bc      ; BC = $0FFD
-lds bc      ; SP = $0FFD
-pla         ; SP = $0FFE
+lds bc      ; SP = $0FFE
 pla         ; SP = $0FFF
+pla         ; SP = $1000
 ```

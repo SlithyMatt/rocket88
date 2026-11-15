@@ -21,10 +21,10 @@ Externally, ROCKET88 will have an 8-bit data bus and a 16-bit address bus. It wi
 At power on, the RESET vector will be fetched and execution will begin at the address read there.
 
 ### Timing
-TBD
+Each rising edge of the clock completes one microcode step, and every instruction takes a whole number of two-step cycles. Fetching the opcode is the first cycle, and fetching a two-byte (NN) operand takes two more. Most instructions take 2 cycles (4 clocks), ranging from 1 cycle for NOP to 6 cycles for BRK. Hardware interrupts take 5 cycles to enter their service routine. The [Microcode sheet](Rocket88.ods) lists every step of every instruction.
 
 ### Interrupts
-ROCKET88 supports three types of interrupts: Reset, Maskable, and Non-Maskable. These are triggered by the RESET, IRQ and NMI pins, when one of them is held low for the rising edge of a clock cycle. Maskable interrupts can be disabled with software (using the [SEI](doc/set.md#sei) instruction), but a Reset or Non-Maskable Interrupt will always halt program execution and run its service routine. The addresses for these routines must be placed in fixed vectors in memory at the following addresses:
+ROCKET88 supports three types of interrupts: Reset, Maskable, and Non-Maskable. These are triggered by the RESET, IRQ and NMI pins, which are all active low. RESET and IRQ are triggered when held low at the rising edge of a clock, while NMI is triggered when it goes from high to low. RESET takes effect immediately, aborting the current instruction, while IRQ and NMI are serviced between instructions. IRQ is level-triggered, so the device requesting it must release the pin once it has been serviced, or the handler will run again after it returns. Maskable interrupts can be disabled with software (using the [SEI](doc/set.md#sei) instruction), but a Reset or Non-Maskable Interrupt will always halt program execution and run its service routine. Servicing an IRQ or NMI (or executing [BRK](doc/brk.md)) pushes PC, P, A, B and C to the stack and disables maskable interrupts, and [RTI](doc/ret.md#rti) restores them all. The addresses for these routines must be placed in fixed vectors in memory at the following addresses:
 
 * $FFFA: IRQ Vector
 * $FFFC: NMI Vector
@@ -50,10 +50,10 @@ PROGRAM_START = $1000
 .org $F000
 reset_handler:
    sei                           ; disable maskable interrupts
-   lds PROGRAM_START-1           ; initialize stack pointer
+   lds PROGRAM_START             ; initialize stack pointer (first push goes to PROGRAM_START-1)
    lda #default_irq_handler.low  ; initalize IRQ_RAM_VECTOR to contain address of default handler in ROM
    sta IRQ_RAM_VECTOR
-   lda #default_irw_handler.high
+   lda #default_irq_handler.high
    sta IRQ_RAM_VECTOR+1
    lda #default_nmi_handler.low  ; initalize NMI_RAM_VECTOR to contain address of default handler in ROM
    sta NMI_RAM_VECTOR
@@ -63,18 +63,18 @@ reset_handler:
    jmp PROGRAM_START             ; jump to start of program in RAM
 
 irq_handler:
-   ldc IRQ_RAM_VECTOR            ; load address in IRQ_RAM_VECTOR into BC
-   ldb IRQ_RAM_VECTOR+1
-   jmp (bc)                      ; jump there
+   ldb #IRQ_RAM_VECTOR.high      ; point BC at IRQ_RAM_VECTOR
+   ldc #IRQ_RAM_VECTOR.low
+   jmp (bc)                      ; jump to the address stored there
 
 default_irq_handler:
    ; do some common, periodic stuff
    rti
 
 nmi_handler:
-   ldc NMI_RAM_VECTOR            ; load address in NMI_RAM_VECTOR into BC
-   ldb NMI_RAM_VECTOR+1
-   jmp (bc)                      ; jump there
+   ldb #NMI_RAM_VECTOR.high      ; point BC at NMI_RAM_VECTOR
+   ldc #NMI_RAM_VECTOR.low
+   jmp (bc)                      ; jump to the address stored there
 
 default_nmi_handler:
    ; do some rare, critical stuff
@@ -129,6 +129,9 @@ The Memory Controller (MC) starts each instruction cycle by fetching a byte from
 * MC_WRITE_LOW - Load address low byte from data bus
 * MC_WRITE_HIGH - Load address high byte from data bus
 * MC_WRITE_FULL - Load full address from address register demux, selected from BC, PC, SP, or DD
+* MC_INC - Increment the address, to read the second byte of a 16-bit value in memory
+
+The MC's address register can also be copied into PC, which is how jumps and subroutine calls to an absolute (NN) address are completed.
 
 The address register is directly connected to the external address bus, with the Read and Write pins controlling when the address should be interpreted as complete by anything on the bus. The MC does not directly control these pins, but it does use them for timing. When reading from memory, the Decoder will control the Read pin which will pulse for a clock cycle, and the MC will read from the external data bus and load the value into its internal data register, where it can be routed to the internal data bus. The MC_WRITE_DATA wire is used by the Decoder to have the MC route the internal data bus to the external data bus through its internal data register so that the desired output value will be in place for the subsequent pulse of the Write pin, also done by the Decoder.
 
@@ -236,7 +239,7 @@ The letters used for each flag are not directly part of the assembly language mn
 
 #### Sign (S)
 
-The Sign flag is set when the resulting value is negative, effectively being the same as bit 7. The case of comparison instrctions, S is set when the value in the base register is less than the operand value.
+The Sign flag is set when the resulting value is negative, effectively being the same as bit 7. In the case of comparison instructions, S is bit 7 of the difference (the base register minus the operand value), which is not the same as "less than" when the values are more than 127 apart. For an unsigned comparison, use the Carry flag instead.
 
 #### Zero (Z)
 
@@ -244,15 +247,15 @@ The zero flag is set when the resulting value is zero. In the case of comparison
 
 #### Carry (C)
 
-The carry flag -- not to be confused with the C register -- is set when a carry or borrow is required when performing arithmetic, to be used by the next arithmetic instruction. It is also used as an effective ninth bit for shifting instructions. For comparison instructions, C is set when the value in the base register is greater than or equal to the operand value.
+The carry flag -- not to be confused with the C register -- is set when a carry or borrow is required when performing arithmetic, to be used by the next arithmetic instruction. Addition sets it on a carry out and [ADC](doc/add.md#adc-adcz) adds it in, while subtraction sets it on a borrow and [SBC](doc/sub.md#sbc-sbcz) subtracts it. It is also used as an effective ninth bit for shifting instructions. For comparison instructions, C is set when the value in the base register is greater than or equal to the operand value (that is, when no borrow is required).
 
 #### Interrupt Disable (I)
 
-Maskable instrupts are disabled when the I flag is set, and IRQ signals are ignored until the flag is cleared again. The Interrupt Disable flag does not disable Non-Maskable Interrupts or the Reset signal.
+Maskable instrupts are disabled when the I flag is set, and IRQ signals are ignored until the flag is cleared again. The Interrupt Disable flag does not disable Non-Maskable Interrupts or the Reset signal. I is also set automatically when an IRQ, NMI or BRK is serviced, and RTI restores its previous value along with the rest of P.
 
 #### Decimal (D)
 
-When the Decimal flag is set, addition and subtraction instructions treat input values as binary-coded decimal (BCD), and will output BCD values as well. All instructions revert to binary arithmetic when D is cleared.
+When the Decimal flag is set, addition and subtraction instructions (ADD, ADC, SUB and SBC) treat input values as binary-coded decimal (BCD), and will output BCD values as well. All instructions revert to binary arithmetic when D is cleared. Increment, decrement, negate and compare instructions are always binary.
 
 #### Break (K)
 
