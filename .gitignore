@@ -138,3 +138,4 @@ db/
 # Icarus Verilog simulation output
 *.vvp
 *.vcd
+verilog/sim/microcode.tsv

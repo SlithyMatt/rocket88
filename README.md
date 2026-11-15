@@ -299,6 +299,22 @@ If you're reading this, you're there already! All the documentation is in markdo
 ### Verilog Core
 The code for implementing ROCKET88 on an FPGA is being written in the Verilog hardware description language (HDL). In the [verilog](../../tree/main/verilog) directory, you'll find the Verilog code, starting with [Rocket88.v](verilog/Rocket88.v), which is the top-level module for the core. The non-Verilog files (with extensions other than .v) are for a Quartus project that will deploy this core to the Terasic DE10 Nano development board. Using this project isn't necessary if you are using a different board or toolchain, as you can just take the .v files and import them into another project for another board.
 
+#### Simulation
+The [verilog/sim](verilog/sim) directory has an [Icarus Verilog](https://steveicarus.github.io/iverilog/) testbench that runs a self-checking program covering the full instruction set, plus the IRQ, NMI and RESET pins. From the `verilog` directory:
+```
+iverilog -g2005 -o sim/tb.vvp sim/tb_Rocket88.v Rocket88.v r88_*.v && vvp sim/tb.vvp
+```
+
+#### Microcode Sheet
+The Microcode sheet of the [spreadsheet](Rocket88.ods) is generated from the decoder, so it always matches the Verilog. After changing [r88_decoder.v](verilog/r88_decoder.v), regenerate it (LibreOffice required, with the spreadsheet closed):
+```
+cd verilog
+iverilog -g2005 -o sim/dump.vvp sim/microcode_dump.v r88_decoder.v
+vvp -n sim/dump.vvp > sim/microcode.tsv
+cd ..
+python3 tools/update_microcode_sheet.py verilog/sim/microcode.tsv Rocket88.ods
+```
+
 Separate from this core project will be another project in another repository for the ROCKET88 reference computer. It will also be targeting the DE10 Nano, and in turn, the [MiSTer](http://www.mistercores.com/mister/), where it can be deployed alongside other retro system cores. Eventually, there will be forks of this reference computer that will target other development boards, providing a complete system for people to use on multiple hardware platforms.
 
 ### Emulator Core Library

@@ -13,7 +13,7 @@ module r88_regblock (
 	input		[7:0] highOut,
 	input 	[3:0] regSel,
 	input    [1:0] regRightSel,
-	input    [1:0] regLeftSel,
+	input    [2:0] regLeftSel,
 	input		regLeft16,
 	input    [1:0] regAddrSel,
 	input 	regWrite,
@@ -27,7 +27,12 @@ module r88_regblock (
 	input		decMode,
 	input		breakFlag,
 	input		irqEn,
-	input    incPC
+	input    incPC,			// PC = PC + 1 (ignored if writing PC)
+	input		pcLoadMC,		// PC = memory controller address register (ignored if writing PC)
+	input		[15:0] mcAddr,
+	input		incSP,			// SP = SP + 1 (ignored if writing SP)
+	input		decSP,			// SP = SP - 1 (ignored if writing SP)
+	input		[1:0] regExchange	// 1: swap BC and DD, 2: swap BC and EE
 );
 
 // regSel values
@@ -105,17 +110,18 @@ end
 always @(*) begin
 	if (regLeft16) begin
 		case (regLeftSel)
-			2'd0: regLeft = r_DD;
-			2'd1: regLeft = r_EE;
-			2'd2: regLeft = r_PC;
-			default: regLeft = r_SP;
+			3'd0: regLeft = r_DD;
+			3'd1: regLeft = r_EE;
+			3'd2: regLeft = r_PC;
+			3'd3: regLeft = r_SP;
+			default: regLeft = {r_B, r_C};
 		endcase
 	end
 	else begin
 		case (regLeftSel)
-			2'd1: regLeft = {8'h00, r_A};
-			2'd2: regLeft = {8'h00, r_B};
-			2'd3: regLeft = {8'h00, r_C};
+			3'd1: regLeft = {8'h00, r_A};
+			3'd2: regLeft = {8'h00, r_B};
+			3'd3: regLeft = {8'h00, r_C};
 			default: regLeft = 16'h0000;
 		endcase
 	end
@@ -151,6 +157,7 @@ always @(posedge sysClock) begin
 		// 16-bit write: low byte from intD (above), high byte from ALU highOut
 		if (regLeft16) begin
 			case (regSel)
+				REG_C:   r_B <= highOut;
 				REG_DDL: r_DD[15:8] <= highOut;
 				REG_EEL: r_EE[15:8] <= highOut;
 				REG_PCL: r_PC[15:8] <= highOut;
@@ -159,7 +166,30 @@ always @(posedge sysClock) begin
 			endcase
 		end
 	end
-	else if (incPC) r_PC <= r_PC + 16'd1;
+
+	// PC and SP counters, unless that register is being written this step
+	if (!(regWrite && ((regSel == REG_PCL) || (regSel == REG_PCH)))) begin
+		if (pcLoadMC) r_PC <= mcAddr;
+		else if (incPC) r_PC <= r_PC + 16'd1;
+	end
+	if (!(regWrite && ((regSel == REG_SPL) || (regSel == REG_SPH)))) begin
+		if (incSP) r_SP <= r_SP + 16'd1;
+		else if (decSP) r_SP <= r_SP - 16'd1;
+	end
+
+	if (!regWrite) begin
+		case (regExchange)
+			2'd1: begin
+				r_DD <= {r_B, r_C};
+				{r_B, r_C} <= r_DD;
+			end
+			2'd2: begin
+				r_EE <= {r_B, r_C};
+				{r_B, r_C} <= r_EE;
+			end
+			default: ; // do nothing
+		endcase
+	end
 end
 
 endmodule

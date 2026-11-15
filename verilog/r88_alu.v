@@ -8,13 +8,16 @@
 // At the end of every step without loadResult, the result is also latched.
 // With loadResult set, the latched result is output instead of computing,
 // so a result can be computed in one step and written back in a later one
-// (e.g. SP +/- 1 while SP itself is the left operand).
+// (e.g. SP +/- 1 while SP itself is the left operand). Holding loadResult
+// with aluResult clear keeps the latched value for later steps.
 //
 // Never set rightSel and aluResult together without loadResult: the ALU would
 // then be driving the same bus it is reading from.
 //
-// Carry convention: for subtraction, carry = NOT borrow (C set when
-// left >= right), which matches the compare definition in the README.
+// Carry convention (per the ISA sheet): for addition, carry out = carry; for
+// subtraction, carry in and carry out are a borrow (SBC computes L - R - C).
+// In 16-bit mode, the 8-bit right operand is sign-extended so it can be used
+// as a relative offset.
 
 module r88_alu(
  	input sysClock,
@@ -28,6 +31,7 @@ module r88_alu(
 	output carryOut,
 	output signOut,			// sign of (possibly latched) 8-bit result
 	output zeroOut,			// zero of (possibly latched) 8-bit result
+	output zero16Out,			// zero of (possibly latched) 16-bit result
 	input invOut,
 	input decMode,
 	input carryInEn,
@@ -46,6 +50,8 @@ localparam ALU_AND  = 3'd6;
 localparam ALU_XOR  = 3'd7;
 
 wire [7:0] w_right = rightSel ? intD : regRight;
+wire [15:0] w_right16 = {{8{w_right[7]}}, w_right};
+wire w_cin = carryInEn & carryIn;
 
 // Combinational result
 reg [7:0] c_low;
@@ -57,7 +63,6 @@ reg [16:0] t_sum16;
 reg [8:0] t_sum8;
 reg [4:0] t_lo;
 reg [4:0] t_hi;
-reg t_cin;
 reg t_borrowLo;
 reg t_borrowHi;
 
@@ -69,29 +74,27 @@ always @(*) begin
 	t_sum8 = 9'h0;
 	t_lo = 5'h0;
 	t_hi = 5'h0;
-	t_cin = 1'b0;
 	t_borrowLo = 1'b0;
 	t_borrowHi = 1'b0;
 
 	case (aluOp)
 		ALU_PASS: c_low = w_right;
 		ALU_SHL: begin
-			c_low = {w_right[6:0], carryInEn & carryIn};
+			c_low = {w_right[6:0], w_cin};
 			c_carry = w_right[7];
 		end
 		ALU_SHR: begin
-			c_low = {carryInEn & carryIn, w_right[7:1]};
+			c_low = {w_cin, w_right[7:1]};
 			c_carry = w_right[0];
 		end
 		ALU_ADD: begin
-			t_cin = carryInEn & carryIn;
 			if (regLeft16) begin
-				t_sum16 = {1'b0, regLeft} + {9'h000, w_right};
+				t_sum16 = {1'b0, regLeft} + {1'b0, w_right16} + {16'h0000, w_cin};
 				{c_high, c_low} = t_sum16[15:0];
 				c_carry = t_sum16[16];
 			end
 			else if (decMode) begin
-				t_lo = {1'b0, regLeft[3:0]} + {1'b0, w_right[3:0]} + {4'h0, t_cin};
+				t_lo = {1'b0, regLeft[3:0]} + {1'b0, w_right[3:0]} + {4'h0, w_cin};
 				if (t_lo > 5'd9) t_lo = t_lo + 5'd6;
 				t_hi = {1'b0, regLeft[7:4]} + {1'b0, w_right[7:4]} + {4'h0, t_lo[4]};
 				if (t_hi > 5'd9) t_hi = t_hi + 5'd6;
@@ -99,31 +102,30 @@ always @(*) begin
 				c_carry = t_hi[4];
 			end
 			else begin
-				t_sum8 = {1'b0, regLeft[7:0]} + {1'b0, w_right} + {8'h00, t_cin};
+				t_sum8 = {1'b0, regLeft[7:0]} + {1'b0, w_right} + {8'h00, w_cin};
 				c_low = t_sum8[7:0];
 				c_carry = t_sum8[8];
 			end
 		end
 		ALU_SUB: begin
-			// carry in of 1 = no borrow; plain SUB/compare (carryInEn=0) never borrows in
-			t_cin = carryInEn ? carryIn : 1'b1;
+			// w_cin is a borrow in; c_carry is a borrow out
 			if (regLeft16) begin
-				t_sum16 = {1'b0, regLeft} - {9'h000, w_right};
+				t_sum16 = {1'b0, regLeft} - {1'b0, w_right16} - {16'h0000, w_cin};
 				{c_high, c_low} = t_sum16[15:0];
-				c_carry = ~t_sum16[16];
+				c_carry = t_sum16[16];
 			end
 			else if (decMode) begin
-				t_lo = {1'b0, regLeft[3:0]} - {1'b0, w_right[3:0]} - {4'h0, ~t_cin};
+				t_lo = {1'b0, regLeft[3:0]} - {1'b0, w_right[3:0]} - {4'h0, w_cin};
 				t_borrowLo = t_lo[4];
 				if (t_borrowLo) t_lo = t_lo - 5'd6;
 				t_hi = {1'b0, regLeft[7:4]} - {1'b0, w_right[7:4]} - {4'h0, t_borrowLo};
 				t_borrowHi = t_hi[4];
 				if (t_borrowHi) t_hi = t_hi - 5'd6;
 				c_low = {t_hi[3:0], t_lo[3:0]};
-				c_carry = ~t_borrowHi;
+				c_carry = t_borrowHi;
 			end
 			else begin
-				t_sum8 = {1'b0, regLeft[7:0]} + {1'b0, ~w_right} + {8'h00, t_cin};
+				t_sum8 = {1'b0, regLeft[7:0]} - {1'b0, w_right} - {8'h00, w_cin};
 				c_low = t_sum8[7:0];
 				c_carry = t_sum8[8];
 			end
@@ -156,5 +158,6 @@ assign highOut = loadResult ? r_high : c_high;
 assign carryOut = loadResult ? r_carry : c_carry;
 assign signOut = w_out[7];
 assign zeroOut = (w_out == 8'h00);
+assign zero16Out = (w_out == 8'h00) && (highOut == 8'h00);
 
 endmodule
