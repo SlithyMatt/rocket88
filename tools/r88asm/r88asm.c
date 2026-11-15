@@ -13,6 +13,8 @@
  *   .byte expr|"string", ...   emit bytes          (also .db)
  *   .word expr, ...            emit 16-bit values  (also .addr, .dw), little endian
  *   .fill count [, value]      emit count copies of a byte
+ *   .macro NAME [param, ...]   define a macro, ended by .endmacro (or .endm);
+ *                              use it as NAME [argument, ...]
  *   mnemonic [operand]         one instruction; operands: a b c bc dd ee (bc) (dd)
  *                              #expression, or an address / label
  *   ; comment
@@ -267,12 +269,30 @@ struct line {
     const char *file;
     int number;
     char *text;
-    long addr;      /* address at start of line (final pass) */
-    int count;      /* bytes emitted by this line (final pass) */
+    long addr;              /* address at start of line (final pass) */
+    int count;              /* bytes emitted by this line (final pass) */
+    int skip;               /* listed, not assembled (macro definitions and uses) */
+    int hidden;             /* assembled, not listed (a label split from a macro use) */
+    const char *macro;      /* macro this line was expanded from, or NULL */
+    const char *use_file;   /* where the (outermost) macro was used */
+    int use_number;
 };
 
-static struct line *lines;
+static struct line *raw_lines;  /* lines as read from the source files */
+static int num_raw, cap_raw;
+static struct line *lines;      /* lines after macro expansion */
 static int num_lines, cap_lines;
+
+static void *xrealloc(void *p, size_t size);
+
+static void append_line(struct line **arr, int *num, int *cap, const struct line *ln)
+{
+    if (*num == *cap) {
+        *cap = *cap ? *cap * 2 : 1024;
+        *arr = xrealloc(*arr, (size_t)*cap * sizeof(**arr));
+    }
+    (*arr)[(*num)++] = *ln;
+}
 
 /* ------------------------------------------------------------------------- */
 /* Symbols                                                                   */
@@ -315,6 +335,21 @@ static void fatal(const char *fmt, ...)
     exit(1);
 }
 
+/* Report an error at a line. Errors in a macro expansion are reported where
+   the macro was used, with the macro name and the line of its definition. */
+static void report(const struct line *ln, const char *fmt, va_list ap)
+{
+    if (ln->macro)
+        fprintf(stderr, "%s:%d: error: ", ln->use_file, ln->use_number);
+    else
+        fprintf(stderr, "%s:%d: error: ", ln->file, ln->number);
+    vfprintf(stderr, fmt, ap);
+    if (ln->macro)
+        fprintf(stderr, " (in macro '%s', %s:%d)", ln->macro, ln->file, ln->number);
+    fprintf(stderr, "\n");
+    errors++;
+}
+
 /* Errors are only reported in the final pass, where every value is known */
 static void error(const char *fmt, ...)
 {
@@ -322,11 +357,17 @@ static void error(const char *fmt, ...)
     if (!final_pass)
         return;
     va_start(ap, fmt);
-    fprintf(stderr, "%s:%d: error: ", cur->file, cur->number);
-    vfprintf(stderr, fmt, ap);
-    fprintf(stderr, "\n");
+    report(cur, fmt, ap);
     va_end(ap);
-    errors++;
+}
+
+/* Errors found while reading the source and expanding macros */
+static void line_error(const struct line *ln, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    report(ln, fmt, ap);
+    va_end(ap);
 }
 
 static void *xrealloc(void *p, size_t size)
@@ -999,6 +1040,8 @@ static void process_line(struct line *ln)
         ln->addr = pc;
         ln->count = 0;
     }
+    if (ln->skip)
+        return;
     strip_line(ln->text, text);
     p = skip_ws(text);
 
@@ -1016,6 +1059,10 @@ static void process_line(struct line *ln)
 
     if (*p == '\0')
         return;
+    if (*p == '@') {
+        error("@ labels can only be used inside a macro");
+        return;
+    }
     if (*p == '.')
         directive(p);
     else
@@ -1064,19 +1111,425 @@ static void read_source(const char *path)
             fatal("%s:%d: line is longer than %d characters", path, number, MAX_LINE);
         while (len && (buf[len - 1] == '\n' || buf[len - 1] == '\r'))
             buf[--len] = '\0';
-        if (num_lines == cap_lines) {
-            cap_lines = cap_lines ? cap_lines * 2 : 1024;
-            lines = xrealloc(lines, (size_t)cap_lines * sizeof(*lines));
+        {
+            struct line ln;
+            memset(&ln, 0, sizeof(ln));
+            ln.file = path;
+            ln.number = number;
+            ln.text = xrealloc(NULL, len + 1);
+            memcpy(ln.text, buf, len + 1);
+            append_line(&raw_lines, &num_raw, &cap_raw, &ln);
         }
-        lines[num_lines].file = path;
-        lines[num_lines].number = number;
-        lines[num_lines].text = xrealloc(NULL, len + 1);
-        memcpy(lines[num_lines].text, buf, len + 1);
-        lines[num_lines].addr = 0;
-        lines[num_lines].count = 0;
-        num_lines++;
     }
     fclose(f);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Macros                                                                    */
+/*                                                                           */
+/*   .macro NAME [param, ...]                                                */
+/*       ...body, using the parameters...                                    */
+/*   .endmacro                       (or .endm)                              */
+/*                                                                           */
+/*   NAME [argument, ...]                                                    */
+/*                                                                           */
+/* Each use is replaced by the body, with every parameter replaced by the    */
+/* text of its argument. An argument that is an expression (anything but a   */
+/* single name or number, a "string", a #value or something already in      */
+/* parentheses) is put in parentheses, so it keeps its meaning inside a      */
+/* larger expression. Labels written @name in a body are made unique to each */
+/* use of the macro. Macros may use other macros, but not themselves.        */
+/* ------------------------------------------------------------------------- */
+
+#define MAX_MACRO_DEPTH 64
+
+struct macro {
+    char name[MAX_NAME];
+    char (*params)[MAX_NAME];
+    int num_params;
+    int first, count;           /* body: raw_lines[first .. first+count-1] */
+    const struct line *def;
+    int expanding;              /* guards against a macro using itself */
+};
+
+static struct macro *macros;
+static int num_macros, cap_macros;
+static int expansion_count;
+
+static struct macro *find_macro(const char *name)
+{
+    int i;
+    for (i = 0; i < num_macros; i++)
+        if (strcmp(macros[i].name, name) == 0)
+            return &macros[i];
+    return NULL;
+}
+
+/* If the line (without comment) is the directive .name, return what follows it */
+static const char *is_directive(const char *text, const char *name)
+{
+    char word[MAX_NAME];
+    const char *p = skip_ws(text), *q;
+    if (*p != '.')
+        return NULL;
+    q = read_ident(p + 1, word);
+    if (!q || !ieq(word, name) || (*q && *q != ' ' && *q != '\t'))
+        return NULL;
+    return skip_ws(q);
+}
+
+static int is_register_name(const char *s)
+{
+    return ieq(s, "a") || ieq(s, "b") || ieq(s, "c") ||
+           ieq(s, "bc") || ieq(s, "dd") || ieq(s, "ee");
+}
+
+static int is_mnemonic(const char *s)
+{
+    int i;
+    for (i = 0; i < NUM_OPCODES; i++)
+        if (ieq(opcodes[i].mnemonic, s))
+            return 1;
+    return 0;
+}
+
+/* Find the .macro definitions in raw_lines and mark their lines to skip */
+static void collect_macros(void)
+{
+    int i;
+    char text[MAX_LINE];
+    for (i = 0; i < num_raw; i++) {
+        const struct line *ln = &raw_lines[i];
+        const char *rest, *after;
+        char name[MAX_NAME];
+        char params[MAX_LINE];
+        char *items[MAX_LINE / 2];
+        struct macro *m;
+        int n, j, k, end;
+
+        strip_line(ln->text, text);
+        if (is_directive(text, "endmacro") || is_directive(text, "endm")) {
+            line_error(ln, ".endmacro without .macro");
+            continue;
+        }
+        rest = is_directive(text, "macro");
+        if (!rest)
+            continue;
+
+        /* find the end of the definition */
+        end = -1;
+        for (j = i + 1; j < num_raw; j++) {
+            strip_line(raw_lines[j].text, text);
+            if (is_directive(text, "endmacro") || is_directive(text, "endm")) {
+                end = j;
+                break;
+            }
+            if (is_directive(text, "macro")) {
+                line_error(&raw_lines[j], "a macro can't be defined inside another macro");
+                break;
+            }
+        }
+        if (end < 0) {
+            line_error(ln, ".macro without .endmacro");
+            for (j = i; j < num_raw; j++)
+                raw_lines[j].skip = 1;
+            return;
+        }
+        for (j = i; j <= end; j++)
+            raw_lines[j].skip = 1;
+
+        strip_line(ln->text, text);
+        rest = is_directive(text, "macro");
+        after = read_ident(rest, name);
+        if (!after) {
+            line_error(ln, ".macro needs a name");
+            i = end;
+            continue;
+        }
+        if (is_mnemonic(name) || find_macro(name)) {
+            line_error(ln, is_mnemonic(name) ? "'%s' is an instruction, so it can't be a macro name"
+                                              : "macro '%s' is already defined", name);
+            i = end;
+            continue;
+        }
+
+        if (num_macros == cap_macros) {
+            cap_macros = cap_macros ? cap_macros * 2 : 32;
+            macros = xrealloc(macros, (size_t)cap_macros * sizeof(*macros));
+        }
+        m = &macros[num_macros++];
+        memset(m, 0, sizeof(*m));
+        strcpy(m->name, name);
+        m->first = i + 1;
+        m->count = end - i - 1;
+        m->def = ln;
+
+        /* parameters */
+        strcpy(params, skip_ws(after));
+        n = params[0] ? split_list(params, items, MAX_LINE / 2) : 0;
+        m->params = xrealloc(NULL, (size_t)(n ? n : 1) * sizeof(*m->params));
+        for (j = 0; j < n; j++) {
+            char pname[MAX_NAME];
+            const char *pend = read_ident(items[j], pname);
+            if (!pend || *pend) {
+                line_error(ln, "bad macro parameter '%s'", items[j]);
+                continue;
+            }
+            if (is_register_name(pname)) {
+                line_error(ln, "'%s' is a register, so it can't be a parameter name", pname);
+                continue;
+            }
+            for (k = 0; k < m->num_params; k++)
+                if (strcmp(m->params[k], pname) == 0)
+                    break;
+            if (k < m->num_params) {
+                line_error(ln, "parameter '%s' is listed twice", pname);
+                continue;
+            }
+            strcpy(m->params[m->num_params++], pname);
+        }
+        i = end;
+    }
+}
+
+/* Is the argument a single token, a string, a #value, or fully parenthesized?
+   If not, it's an expression that gets parentheses when substituted. */
+static int simple_argument(const char *a)
+{
+    const char *p;
+    if (a[0] == '#' || a[0] == '"' || a[0] == '\'')
+        return 1;
+    if (a[0] == '(') {
+        int depth = 0;
+        for (p = a; *p; p++) {
+            if (*p == '(')
+                depth++;
+            else if (*p == ')' && --depth == 0)
+                return p[1] == '\0';
+        }
+        return 0;
+    }
+    for (p = a; *p; p++)
+        if (!ident_char((unsigned char)*p) && *p != '$' && *p != '%')
+            return 0;
+    return 1;
+}
+
+/* Append s to the output buffer; returns 0 if it doesn't fit */
+static int put(char *out, size_t *len, size_t size, const char *s)
+{
+    size_t n = strlen(s);
+    if (*len + n >= size)
+        return 0;
+    memcpy(out + *len, s, n + 1);
+    *len += n;
+    return 1;
+}
+
+/* Substitute a macro's arguments and local labels into one body line */
+static int substitute(const char *src, const struct macro *m, char **args, int id,
+                      char *out, size_t size)
+{
+    size_t len = 0;
+    char quote = 0;
+    char name[MAX_NAME];
+    char tmp[MAX_NAME + 32];
+    int prev = 0;
+    const char *p = src;
+    out[0] = '\0';
+    while (*p) {
+        if (quote) {
+            char c[3] = {0, 0, 0};
+            c[0] = *p;
+            if (*p == '\\' && p[1])
+                c[1] = *++p;
+            else if (*p == quote)
+                quote = 0;
+            p++;
+            if (!put(out, &len, size, c))
+                return 0;
+            prev = 0;
+            continue;
+        }
+        if (*p == ';')
+            return put(out, &len, size, p);
+        if (*p == '"' || *p == '\'') {
+            char c[2] = {0, 0};
+            c[0] = quote = *p++;
+            if (!put(out, &len, size, c))
+                return 0;
+            continue;
+        }
+        if (*p == '@' && ident_start((unsigned char)p[1]) && !ident_char(prev)) {
+            /* local label: unique to this use of the macro */
+            p = read_ident(p + 1, name);
+            sprintf(tmp, "__%s_%d", name, id);
+            if (!put(out, &len, size, tmp))
+                return 0;
+            prev = 'x';
+            continue;
+        }
+        if (ident_start((unsigned char)*p) && !ident_char(prev) && prev != '.') {
+            int i;
+            const char *text = name;
+            p = read_ident(p, name);
+            for (i = 0; i < m->num_params; i++)
+                if (strcmp(m->params[i], name) == 0)
+                    break;
+            if (i < m->num_params) {
+                if (simple_argument(args[i])) {
+                    text = args[i];
+                } else {
+                    if (!put(out, &len, size, "("))
+                        return 0;
+                    if (!put(out, &len, size, args[i]))
+                        return 0;
+                    text = ")";
+                }
+            }
+            if (!put(out, &len, size, text))
+                return 0;
+            prev = 'x';
+            continue;
+        }
+        if (*p == '$' || *p == '%' || isdigit((unsigned char)*p)) {
+            /* a number: copy it whole, so its digits aren't taken for names */
+            const char *start = p++;
+            char num[MAX_LINE];
+            while (ident_char((unsigned char)*p))
+                p++;
+            if ((size_t)(p - start) >= sizeof(num))
+                return 0;
+            memcpy(num, start, (size_t)(p - start));
+            num[p - start] = '\0';
+            if (!put(out, &len, size, num))
+                return 0;
+            prev = 'x';
+            continue;
+        }
+        {
+            char c[2] = {0, 0};
+            c[0] = *p++;
+            if (!put(out, &len, size, c))
+                return 0;
+            prev = (unsigned char)c[0];
+        }
+    }
+    return 1;
+}
+
+static void expand_line(const struct line *ln, int depth);
+
+/* Expand one use of a macro, with the argument text after its name */
+static void use_macro(struct macro *m, const char *argtext, const struct line *at, int depth)
+{
+    char buf[MAX_LINE];
+    char *args[MAX_LINE / 2];
+    int n, i, id;
+
+    if (m->expanding) {
+        line_error(at, "macro '%s' uses itself", m->name);
+        return;
+    }
+    if (depth >= MAX_MACRO_DEPTH) {
+        line_error(at, "macros are nested more than %d deep", MAX_MACRO_DEPTH);
+        return;
+    }
+    strcpy(buf, argtext);
+    n = buf[0] ? split_list(buf, args, MAX_LINE / 2) : 0;
+    if (n != m->num_params) {
+        line_error(at, "macro '%s' takes %d argument%s, but %d %s given", m->name, m->num_params,
+                   m->num_params == 1 ? "" : "s", n, n == 1 ? "was" : "were");
+        return;
+    }
+    for (i = 0; i < n; i++) {
+        if (args[i][0] == '\0') {
+            line_error(at, "argument %d of macro '%s' is empty", i + 1, m->name);
+            return;
+        }
+    }
+
+    id = ++expansion_count;
+    m->expanding = 1;
+    for (i = 0; i < m->count; i++) {
+        const struct line *body = &raw_lines[m->first + i];
+        char text[MAX_LINE];
+        struct line ln;
+        if (!substitute(body->text, m, args, id, text, sizeof(text))) {
+            memset(&ln, 0, sizeof(ln));
+            ln = *body;
+            ln.macro = m->name;
+            ln.use_file = at->macro ? at->use_file : at->file;
+            ln.use_number = at->macro ? at->use_number : at->number;
+            line_error(&ln, "line is longer than %d characters after substituting arguments", MAX_LINE - 1);
+            continue;
+        }
+        memset(&ln, 0, sizeof(ln));
+        ln.file = body->file;
+        ln.number = body->number;
+        ln.text = xrealloc(NULL, strlen(text) + 1);
+        strcpy(ln.text, text);
+        ln.macro = m->name;
+        ln.use_file = at->macro ? at->use_file : at->file;
+        ln.use_number = at->macro ? at->use_number : at->number;
+        expand_line(&ln, depth + 1);
+    }
+    m->expanding = 0;
+}
+
+/* Append a line to the program, expanding it if it uses a macro */
+static void expand_line(const struct line *ln, int depth)
+{
+    char text[MAX_LINE];
+    char name[MAX_NAME];
+    const char *p, *q, *word;
+    struct macro *m;
+
+    if (ln->skip) {
+        append_line(&lines, &num_lines, &cap_lines, ln);
+        return;
+    }
+    strip_line(ln->text, text);
+    p = skip_ws(text);
+    word = p;
+    q = read_ident(p, name);
+    if (q && *skip_ws(q) == ':') {
+        word = skip_ws(skip_ws(q) + 1);
+        q = read_ident(word, name);
+    }
+    if (!q || (*q && *q != ' ' && *q != '\t') || !(m = find_macro(name))) {
+        append_line(&lines, &num_lines, &cap_lines, ln);
+        return;
+    }
+    if (word != p) {
+        /* keep a label in front of the macro, on its own line */
+        struct line label = *ln;
+        size_t len = (size_t)(word - p);
+        label.hidden = 1;
+        label.text = xrealloc(NULL, len + 1);
+        memcpy(label.text, p, len);
+        label.text[len] = '\0';
+        append_line(&lines, &num_lines, &cap_lines, &label);
+    }
+    {
+        /* list the use of the macro itself, then its expansion */
+        struct line use = *ln;
+        use.skip = 1;
+        if (word != p) {
+            use.text = xrealloc(NULL, strlen(ln->text) + 1);
+            strcpy(use.text, ln->text);
+        }
+        append_line(&lines, &num_lines, &cap_lines, &use);
+    }
+    use_macro(m, skip_ws(q), ln, depth);
+}
+
+static void expand_macros(void)
+{
+    int i;
+    collect_macros();
+    for (i = 0; i < num_raw; i++)
+        expand_line(&raw_lines[i], 0);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -1162,13 +1615,21 @@ static void write_listing(FILE *f)
     for (i = 0; i < num_lines; i++) {
         struct line *ln = &lines[i];
         char bytes[3 * 4 + 1];
+        char number[16];
         int shown = 0;
+        if (ln->hidden)
+            continue;
+        /* lines from a macro are numbered by where it was used, marked + */
+        if (ln->macro)
+            sprintf(number, "%5d+", ln->use_number);
+        else
+            sprintf(number, "%5d ", ln->number);
         do {
             bytes[0] = '\0';
             for (j = 0; j < 4 && shown + j < ln->count; j++)
                 sprintf(bytes + 3 * j, "%02X ", mem[(ln->addr + shown + j) & 0xFFFF]);
             if (shown == 0)
-                fprintf(f, "%5d  %04lX  %-12s  %s\n", ln->number, ln->addr & 0xFFFF, bytes, ln->text);
+                fprintf(f, "%s %04lX  %-12s  %s\n", number, ln->addr & 0xFFFF, bytes, ln->text);
             else
                 fprintf(f, "       %04lX  %-12s\n", (ln->addr + shown) & 0xFFFF, bytes);
             shown += 4;
@@ -1263,14 +1724,10 @@ int main(int argc, char **argv)
         usage(stderr);
         return 1;
     }
+    expand_macros();
     if (strcmp(format, "bin") && strcmp(format, "hex") && strcmp(format, "mem"))
         fatal("unknown format '%s' (use bin, hex or mem)", format);
-    if (num_lines == 0) {
-        static struct line empty = {"(input)", 0, "", 0, 0};
-        cur = &empty;
-    }
-
-    if (num_lines)
+    if (num_lines && !errors)
         assemble();
     if (errors) {
         fprintf(stderr, "r88asm: %d error%s, no output written\n", errors, errors == 1 ? "" : "s");

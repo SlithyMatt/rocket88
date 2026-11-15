@@ -6,7 +6,8 @@
 2. The example ROM and RAM programs from the main README are assembled
    together and run on the Verilog core (Icarus Verilog), checking the RAM
    vectors they set up.
-3. Feature tests: expressions, directives, zero-mode selection, output formats.
+3. Feature tests: expressions, directives, zero-mode selection, output formats,
+   and macros.
 4. Error tests: each bad input must fail with the expected message and line.
 5. examples/showcase.asm is assembled and run on the Verilog core, and every
    result it stores is checked against values computed here.
@@ -203,6 +204,56 @@ def test_features():
 
 
 # ---------------------------------------------------------------------------
+# Macros
+# ---------------------------------------------------------------------------
+
+def test_macros():
+    expect_bytes(".macro TWELVE p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12\n"
+                 ".byte p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12\n.endmacro\n"
+                 "TWELVE 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\n", 0, list(range(1, 13)),
+                 "macro with 12 parameters")
+    expect_bytes(".macro NONE\nnop\nnop\n.endm\nNONE\n", 0, [0, 0], "macro with no parameters")
+    expect_bytes(".macro M x\nlda #x*2\nlda #x.low\nlda #-x & $FF\n.endmacro\nM 1+2\n", 0,
+                 [0x14, 6, 0x14, 3, 0x14, 0xFD], "expression arguments keep their precedence")
+    expect_bytes(".macro M x, y\n.byte x * y, (x) / 2, x << 1\n.endmacro\nM (3+1), $10 | 1\n", 0,
+                 [0x44, 2, 8], "parenthesized and operator arguments")
+    expect_bytes(".macro M x\n.word x\n.byte x.high\n.endmacro\nM table+$100\ntable:\n", 0,
+                 [0x03, 0x01, 0x01], "label arguments, forward reference, .high")
+    expect_bytes(".macro M r, p\nld r p\n.endmacro\n.macro LD r, p\ninc r\nsta p\n.endmacro\n"
+                 "LD b, (bc)\nLD c, (dd)\n", 0, [0x8F, 0x1E, 0x97, 0x58], "register and indirect arguments")
+    expect_bytes(".macro M v\nlda v\n.endmacro\nM #5\nM #0\nM c\n", 0, [0x14, 5, 0x10, 0x13],
+                 "#value and register arguments, #0 to Zero mode")
+    expect_bytes(".macro TEXT s\n.byte s, 0\n.endmacro\nTEXT \"a, b\"\n", 0,
+                 [ord("a"), ord(","), ord(" "), ord("b"), 0], "string argument containing a comma")
+    expect_bytes(".macro WAIT n\nlda #n\n@loop: dec a\njpnz @loop\n.endmacro\nWAIT 3\nWAIT 4\n", 0,
+                 [0x14, 3, 0x9F, 0x54, 0xFD, 0x14, 4, 0x9F, 0x54, 0xFD], "local labels in each use")
+    expect_bytes(".macro INNER x\n.byte x\n.endm\n.macro OUTER x, y\nINNER x+1\nINNER y\n.endm\n"
+                 "OUTER 1, 5\n", 0, [2, 5], "nested macros")
+    expect_bytes("USE 7\n.macro USE x\n.byte x\n.endm\n", 0, [7], "macro used before its definition")
+    expect_bytes(".macro M x\n.byte x\n.endm\nhere: M here+1\n.word here\n", 0, [1, 0, 0],
+                 "label in front of a macro use")
+    expect_bytes(".macro M p\n.byte p ; p in a comment is not replaced\n.byte 'p', \"p\"\n.endm\n"
+                 "M 9\n", 0, [9, ord("p"), ord("p")], "no substitution in comments, strings or characters")
+    expect_bytes(".macro M f\n.byte $f0, f, 0xf\n.endm\nM 7\n", 0, [0xF0, 7, 0x0F],
+                 "no substitution inside numbers")
+
+    # A macro defined in one file and used in another
+    defs = write("defs.asm", ".macro PAIR a1, a2\n.byte a1, a2\n.endmacro\n")
+    use = write("use.asm", "PAIR 1, 2\n")
+    out = os.path.join(work, "pair.mem")
+    res = r88asm("-f", "mem", "-o", out, defs, use)
+    check(res.returncode == 0 and read_mem(out) == {0: 1, 1: 2}, "macro shared between input files")
+
+    # The listing shows the use of a macro and its expansion
+    lst = os.path.join(work, "macro.lst")
+    res, _ = assemble(".macro M x\nlda #x\n.endm\nM 4\n", "-l", lst)
+    with open(lst) as f:
+        listing = f.read()
+    check("    4  0000                M 4" in listing and "    4+ 0000  14 04" in listing,
+          "listing shows macro expansions")
+
+
+# ---------------------------------------------------------------------------
 # 4. Errors
 # ---------------------------------------------------------------------------
 
@@ -223,6 +274,20 @@ ERRORS = [
     (".org $FFFF\nnop\nnop\n", 3, "address past $FFFF"),
     ("lda #1/0\n", 1, "division by zero"),
     ("lda #$12G\n", 1, "invalid number"),
+    (".macro M a1, a2\nlda #a1\n.endm\nM 1\n", 4, "macro 'M' takes 2 arguments, but 1 was given"),
+    (".macro M x\nlda #x+256\n.endm\nnop\nM 5\n", 5, "does not fit in a byte (in macro 'M', "),
+    (".macro M x\nM x\n.endm\nM 1\n", 4, "macro 'M' uses itself"),
+    (".macro M x\nnop\n", 1, ".macro without .endmacro"),
+    ("nop\n.endmacro\n", 2, ".endmacro without .macro"),
+    (".macro M\n.macro N\n.endm\n.endm\n", 2, "can't be defined inside another macro"),
+    (".macro lda x\n.endm\n", 1, "'lda' is an instruction, so it can't be a macro name"),
+    (".macro M b\n.endm\n", 1, "'b' is a register, so it can't be a parameter name"),
+    (".macro M x, x\n.endm\n", 1, "parameter 'x' is listed twice"),
+    (".macro M\n.endm\n.macro M\n.endm\n", 3, "macro 'M' is already defined"),
+    (".macro M x, y\n.endm\nM 1,\n", 3, "argument 2 of macro 'M' is empty"),
+    (".macro A1\njpnz far\n.endm\n.macro B1\nA1\n.endm\nB1\n.fill 200\nfar: nop\n", 7,
+     "relative target is out of range"),
+    ("@x: nop\n", 1, "@ labels can only be used inside a macro"),
 ]
 
 
@@ -297,6 +362,7 @@ def test_showcase():
         33: 0xB0,
         34: 0x5A, 35: 0xA5, 36: 0xFF, 37: 0xFE,
         38: 4,
+        39: (0x12F0 * 2 + 0x0F25 - 0x25) & 0xFF, 40: (0x12F0 * 2 + 0x0F25 - 0x25) >> 8,
     }
     for i, b in enumerate(bits):
         expected[11 + i] = b
@@ -305,6 +371,10 @@ def test_showcase():
         check(got == value, "showcase: RESULTS+%d should be $%02X, got $%02X" % (offset, value, got))
     copied = bytes(memory.get(0x0340 + i, 0) for i in range(len(message) + 1))
     check(copied == message.encode() + b"\0", "showcase: string copy")
+    filled = bytes(memory.get(0x0340 + i, 0) for i in range(len(message) + 1, 24))
+    check(filled == b"*" * (24 - len(message) - 1), "showcase: FILL macro (rest of the buffer)")
+    check([memory.get(0x0360 + i, 0) for i in range(5)] == [0xE5] * 4 + [0],
+          "showcase: FILL macro (second use)")
     check(memory.get(0x01FF) == 0xEE, "showcase: push on the second stack")
 
     documented = {op for op in ref.mnemonics() if not ref.mnemonics()[op].startswith("NOP+")}
@@ -322,7 +392,7 @@ def main():
     if not os.path.exists(R88ASM):
         sys.exit("build r88asm first (make)")
     for name, fn in (("doc examples", test_doc_examples), ("README system", test_readme_system),
-                     ("features", test_features), ("errors", test_errors),
+                     ("features", test_features), ("macros", test_macros), ("errors", test_errors),
                      ("showcase example", test_showcase)):
         print("- " + name)
         fn()

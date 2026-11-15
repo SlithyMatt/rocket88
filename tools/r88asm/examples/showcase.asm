@@ -6,6 +6,7 @@
 ; Every documented instruction is used except RST, which would restart it.
 ;
 ; Assemble with:   r88asm -l showcase.lst showcase.asm
+; The listing shows each macro use (ADD16, FILL) followed by its expansion.
 ; The test suite (make test) runs it on the Verilog core and checks every result.
 
 ; ---------------------------------------------------------------------------
@@ -36,12 +37,43 @@ R_DONE      = RESULTS+32    ; $AA when all tasks are done
 R_BRK_OK    = RESULTS+33    ; $B0 if the BRK count was checked
 R_ZERO      = RESULTS+34    ; Zero mode results (4 bytes)
 R_CALLS     = RESULTS+38    ; number of conditional calls taken
+R_SUM2      = RESULTS+39    ; 16-bit sum of expressions (2 bytes)
 
 ; Inputs
 NUM1        = $12F0
 NUM2        = $0F25
 MULT_A      = $B7
 MULT_B      = $5D
+
+; ---------------------------------------------------------------------------
+; Macros
+; ---------------------------------------------------------------------------
+
+; dest = x + y, for 16-bit values known when assembling.
+; Arguments can be expressions: ADD16 R_SUM2, NUM1*2, NUM2-$25
+.macro ADD16 dest, x, y
+    lda #x.low
+    add #y.low              ; carry out of the low byte...
+    sta dest
+    lda #x.high
+    adc #y.high             ; ...into the high byte
+    sta dest+1
+.endmacro
+
+; Store count bytes (1-256) of value, starting at address start.
+; @loop is a local label, so FILL can be used more than once.
+.macro FILL start, count, value
+    ldb #start.high
+    ldc #start.low
+    exd                     ; DD = pointer
+    ldb #count
+    lda #value
+@loop:
+    sta (dd)
+    inc dd
+    dec b
+    jpnz @loop
+.endmacro
 
 ; ---------------------------------------------------------------------------
 ; Startup
@@ -65,6 +97,8 @@ clear:
 ; ---------------------------------------------------------------------------
 ; Task 1: copy a zero-terminated string with two pointers, and measure it
 ; ---------------------------------------------------------------------------
+    FILL BUFFER, 24, '*'    ; the copy overwrites the start of this
+    FILL BUFFER+32, 4, $E5
     ldb #BUFFER.high
     ldc #BUFFER.low
     exd                     ; DD = destination
@@ -85,12 +119,8 @@ copied:
 ; ---------------------------------------------------------------------------
 ; Task 2: 16-bit addition and subtraction
 ; ---------------------------------------------------------------------------
-    lda #NUM1.low
-    add #NUM2.low           ; ADD #N, carry out of the low byte
-    sta R_SUM
-    lda #NUM1.high
-    adc #NUM2.high          ; ADC #N, carry into the high byte
-    sta R_SUM+1
+    ADD16 R_SUM, NUM1, NUM2         ; ADD #N and ADC #N, in a macro
+    ADD16 R_SUM2, NUM1*2, NUM2-$25  ; expressions as arguments
 
     lda num_a               ; LDA NN
     sub num_b               ; SUB NN, borrow out of the low byte
