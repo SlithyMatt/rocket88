@@ -139,3 +139,11 @@ db/
 *.vvp
 *.vcd
 verilog/sim/microcode.tsv
+
+# r88asm build output
+tools/r88asm/r88asm
+tools/r88asm/r88asm.exe
+tools/r88asm/examples/*.bin
+tools/r88asm/examples/*.hex
+tools/r88asm/examples/*.mem
+tools/r88asm/examples/*.lst
