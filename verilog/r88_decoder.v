@@ -186,6 +186,7 @@ assign signFlag = r_signFlag;
 assign zeroFlag = r_zeroFlag;
 assign breakFlag = r_breakFlag;
 assign irqEn = r_irqEn;
+
 assign decMode = r_decMode;
 
 // Constant driven onto intD by the decoder (the "intD" column of the sheet)
@@ -202,6 +203,14 @@ reg forceCin;					// force ALU carry in to 1 (increment/decrement)
 reg decEn;						// allow decimal mode in the ALU
 reg [2:0] flagSel;			// flag to set/clear at end of step
 reg flagVal;					// value for flagSel
+
+// The interrupt enable as it will be after this step, so that an instruction
+// that changes it in its last step (BRK and hardware interrupts set I, CLI
+// clears it) takes effect before the next IRQ is considered. Without this,
+// an IRQ still held low at the end of the interrupt sequence is taken again
+// before the handler's first instruction.
+wire irqEnNext = (regWrite && (regSel == REG_P)) ? ~intD[4] :
+                 (flagSel == FLAG_IEN) ? flagVal : r_irqEn;
 reg stall;						// hold this step (HLT)
 reg lastStep;					// this is the final step of the instruction
 
@@ -945,7 +954,7 @@ always @(posedge sysClock) begin
 			r_step <= S2N;
 			r_nmiPending <= 1'b0;
 		end
-		else if (!irq && r_irqEn) begin
+		else if (!irq && irqEnNext) begin
 			r_opcode <= OP_BRK;
 			r_vector <= VEC_IRQ;
 			r_hwInt <= 1'b1;

@@ -53,6 +53,12 @@ wire fC = cpu.decoder.r_carryFlag;
 wire fD = cpu.decoder.r_decMode;
 wire fIEn = cpu.decoder.r_irqEn;
 
+// Count instruction fetches at the IRQ/BRK handler
+integer irq_entries = 0;
+always @(negedge sysClock)
+	if (!cpu.decoder.r_init && cpu.decoder.r_step == 0 && cpu.registers.r_PC == 16'h0700)
+		irq_entries = irq_entries + 1;
+
 integer errors = 0;
 integer checks = 0;
 integer i;
@@ -494,10 +500,14 @@ initial begin
 	check16("at HLT", PC, m_hlt);
 	repeat (20) @(negedge sysClock);
 	check16("HLT holds", PC, m_hlt_done);
+	// Hold IRQ low until the handler is running, as a device does until
+	// it's serviced: the handler must be entered only once
+	irq_entries = 0;
 	irq = 1'b0;
-	while (PC != 16'h0700) @(negedge sysClock);
+	while (mem[16'h3F00] != 8'h99) @(negedge sysClock);
 	irq = 1'b1;
 	run_to(m_hlt_done);  check8("IRQ handler ran", mem[16'h3F00], 8'h99); check8("IRQ RTI A", A, 8'h01);
+	                     check8("IRQ handler entered once", irq_entries, 8'd1);
 	                     check8("IRQ pushed K clear", mem[16'h04FD] & 8'h04, 8'h00);
 	run_to(m_sei);
 	mem[16'h3F00] = 8'h00;

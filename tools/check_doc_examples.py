@@ -38,6 +38,8 @@ from update_microcode_sheet import mnemonics  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 VERILOG = os.path.join(ROOT, "verilog")
+# The core only (the directory also has board top levels)
+CORE_SOURCES = ["Rocket88.v", "r88_mc.v", "r88_regblock.v", "r88_alu.v", "r88_decoder.v"]
 START = 0x0200
 
 
@@ -356,8 +358,7 @@ def code_blocks(path):
 
 def main():
     workdir = tempfile.mkdtemp(prefix="r88doc")
-    sources = ["sim/tb_program.v"] + sorted(
-        os.path.basename(p) for p in glob.glob(os.path.join(VERILOG, "*.v")))
+    sources = ["sim/tb_program.v"] + CORE_SOURCES
     subprocess.run(["iverilog", "-g2005", "-o", os.path.join(workdir, "tb.vvp")] + sources,
                    cwd=VERILOG, check=True)
     total = bad = 0

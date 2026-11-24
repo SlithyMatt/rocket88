@@ -147,3 +147,7 @@ tools/r88asm/examples/*.bin
 tools/r88asm/examples/*.hex
 tools/r88asm/examples/*.mem
 tools/r88asm/examples/*.lst
+verilog/sim/*.ppm
+verilog/system/boot.lst
+verilog/output_files/
+verilog/incremental_db/

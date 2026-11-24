@@ -300,7 +300,19 @@ Effectively the same as NOP, but also expects a two-byte operand that will be fe
 If you're reading this, you're there already! All the documentation is in markdown, mostly in the [doc](../../tree/main/doc) directory, which contains detailed information about each instruction, as linked in the [opcode table](#opcode-table) above.
 
 ### Verilog Core
-The code for implementing ROCKET88 on an FPGA is being written in the Verilog hardware description language (HDL). In the [verilog](../../tree/main/verilog) directory, you'll find the Verilog code, starting with [Rocket88.v](verilog/Rocket88.v), which is the top-level module for the core. The non-Verilog files (with extensions other than .v) are for a Quartus project that will deploy this core to the Terasic DE10 Nano development board. Using this project isn't necessary if you are using a different board or toolchain, as you can just take the .v files and import them into another project for another board.
+The code for implementing ROCKET88 on an FPGA is being written in the Verilog hardware description language (HDL). In the [verilog](../../tree/main/verilog) directory, you'll find the Verilog code, starting with [Rocket88.v](verilog/Rocket88.v), which is the top-level module for the core. The core doesn't depend on any board or toolchain, so you can import its .v files into a project for any board.
+
+#### Rocket88 Computer
+The [verilog/system](verilog/system) directory has a complete computer built around the core, with:
+* 64 KB of RAM, plus 8 MB of banked SDRAM;
+* VGA text and bitmap modes;
+* four-voice sound;
+* PS/2 keyboard and mouse ports;
+* a boot program.
+
+The Quartus project ([Rocket88.qpf](verilog/Rocket88.qpf), [Rocket88.qsf](verilog/Rocket88.qsf)) builds it for the [Cyclone IV EP4CE6 development board](https://github.com/SlithyMatt/Altera-Cyclone-IV-board-V3.0). See the system [README](verilog/system/README.md) for the memory map, the I/O registers and a full-system simulation.
+
+The system module doesn't depend on the board, so more boards can be added with a new top level, pin assignments and timing constraints. The DE10 Nano, and in turn the [MiSTer](http://www.mistercores.com/mister/), is planned next, where the computer can be deployed alongside other retro system cores.
 
 #### Simulation
 The [verilog/sim](verilog/sim) directory has an [Icarus Verilog](https://steveicarus.github.io/iverilog/) testbench that runs a self-checking program covering the full instruction set, plus the IRQ, NMI and RESET pins. From the `verilog` directory:
@@ -318,7 +330,6 @@ cd ..
 python3 tools/update_microcode_sheet.py verilog/sim/microcode.tsv Rocket88.ods
 ```
 
-Separate from this core project will be another project in another repository for the ROCKET88 reference computer. It will also be targeting the DE10 Nano, and in turn, the [MiSTer](http://www.mistercores.com/mister/), where it can be deployed alongside other retro system cores. Eventually, there will be forks of this reference computer that will target other development boards, providing a complete system for people to use on multiple hardware platforms.
 
 #### Instruction Documentation
 Every code example in the [doc](doc) directory is assembled and run on the Verilog core, checking comments such as `; A = $42, carry = 1` against the result, and every opcode in the docs' cycle tables is timed to check its cycle count (Icarus Verilog required). From the repository root:

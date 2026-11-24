@@ -103,8 +103,8 @@ def test_doc_examples():
 def run_sim(mem_path, max_clocks):
     vvp = os.path.join(work, "tb.vvp")
     if not os.path.exists(vvp):
-        sources = ["sim/tb_program.v"] + sorted(
-            f for f in os.listdir(VERILOG) if f.endswith(".v"))
+        sources = ["sim/tb_program.v", "Rocket88.v", "r88_mc.v", "r88_regblock.v",
+                   "r88_alu.v", "r88_decoder.v"]
         subprocess.run(["iverilog", "-g2005", "-o", vvp] + sources, cwd=VERILOG, check=True)
     out = subprocess.run(["vvp", "-n", vvp, "+hex=" + mem_path, "+stop=ffff", "+max=%d" % max_clocks],
                          capture_output=True, text=True, check=True).stdout

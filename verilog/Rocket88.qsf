@@ -1,61 +1,194 @@
 # -------------------------------------------------------------------------- #
 #
-# Copyright (C) 2021  Intel Corporation. All rights reserved.
-# Your use of Intel Corporation's design tools, logic functions 
-# and other software and tools, and any partner logic 
-# functions, and any output files from any of the foregoing 
-# (including device programming or simulation files), and any 
-# associated documentation or information are expressly subject 
-# to the terms and conditions of the Intel Program License 
-# Subscription Agreement, the Intel Quartus Prime License Agreement,
-# the Intel FPGA IP License Agreement, or other applicable license
-# agreement, including, without limitation, that your use is for
-# the sole purpose of programming logic devices manufactured by
-# Intel and sold by Intel or its authorized distributors.  Please
-# refer to the applicable agreement for further details, at
-# https://fpgasoftware.intel.com/eula.
+# Rocket88 computer for the Cyclone IV EP4CE6 development board
+# ("Altera Cyclone IV board V3.0", sold as OMDAZZ / RZ-EasyFPGA and similar)
 #
-# -------------------------------------------------------------------------- #
+# Board documentation: https://github.com/SlithyMatt/Altera-Cyclone-IV-board-V3.0
+# Top level: c4board.v. Timing constraints: Rocket88.sdc.
+# The memory map and I/O registers are described in system/README.md.
 #
-# Quartus Prime
-# Version 21.1.0 Build 842 10/21/2021 SJ Lite Edition
-# Date created = 00:30:13  August 15, 2022
-#
-# -------------------------------------------------------------------------- #
-#
-# Notes:
-#
-# 1) The default values for assignments are stored in the file:
-#		Rocket88_assignment_defaults.qdf
-#    If this file doesn't exist, see file:
-#		assignment_defaults.qdf
-#
-# 2) Intel recommends that you do not modify this file. This
-#    file is updated automatically by the Quartus Prime software
-#    and any changes you make may be lost or overwritten.
+# Quartus Prime Lite 21.1 or later. Before compiling, build the memory
+# images (system/boot.mem and system/font.mem) if boot.asm has changed:
+#   python3 ../tools/build_system_roms.py
 #
 # -------------------------------------------------------------------------- #
 
 
-set_global_assignment -name FAMILY "Cyclone V"
-set_global_assignment -name DEVICE 5CSEBA6U23I7
-set_global_assignment -name TOP_LEVEL_ENTITY Rocket88
+# Project
+# -------
+set_global_assignment -name FAMILY "Cyclone IV E"
+set_global_assignment -name DEVICE EP4CE6E22C8
+set_global_assignment -name TOP_LEVEL_ENTITY c4board
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 21.1.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "00:30:13  AUGUST 15, 2022"
 set_global_assignment -name LAST_QUARTUS_VERSION "21.1.0 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
-set_global_assignment -name MIN_CORE_JUNCTION_TEMP "-40"
-set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
+set_global_assignment -name NOMINAL_CORE_SUPPLY_VOLTAGE 1.2V
 set_global_assignment -name ERROR_CHECK_FREQUENCY_DIVISOR 1
+set_global_assignment -name DEVICE_FILTER_PACKAGE "ANY QFP"
+set_global_assignment -name DEVICE_FILTER_PIN_COUNT 144
+set_global_assignment -name DEVICE_FILTER_SPEED_GRADE 8
+
+# Configuration: serial flash (the board's examples use EPCS4; the schematic
+# allows EPCS16, so change this to match the chip on your board), and the
+# dual-purpose pins as regular I/O afterwards
+set_global_assignment -name USE_CONFIGURATION_DEVICE ON
+set_global_assignment -name STRATIX_CONFIGURATION_DEVICE EPCS4
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-STATED"
+set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS REGULAR IO"
+set_global_assignment -name RESERVE_DATA0_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
+set_global_assignment -name RESERVE_DATA1_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
+set_global_assignment -name RESERVE_FLASH_NCE_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
+set_global_assignment -name RESERVE_DCLK_AFTER_CONFIGURATION "AS INPUT TRI-STATED"
+
+# Simulation
 set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim (Verilog)"
 set_global_assignment -name EDA_TIME_SCALE "1 ps" -section_id eda_simulation
 set_global_assignment -name EDA_OUTPUT_DATA_FORMAT "VERILOG HDL" -section_id eda_simulation
-set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_timing
-set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_symbol
-set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_signal_integrity
-set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST OFF -section_id eda_board_design_boundary_scan
+
+# Sources
+# -------
+set_global_assignment -name VERILOG_FILE c4board.v
+set_global_assignment -name VERILOG_FILE system/r88_pll.v
+set_global_assignment -name VERILOG_FILE system/r88_system.v
+set_global_assignment -name VERILOG_FILE system/r88_sdram.v
+set_global_assignment -name VERILOG_FILE system/r88_video.v
+set_global_assignment -name VERILOG_FILE system/r88_ps2.v
+set_global_assignment -name VERILOG_FILE system/r88_sound.v
 set_global_assignment -name VERILOG_FILE Rocket88.v
 set_global_assignment -name VERILOG_FILE r88_mc.v
 set_global_assignment -name VERILOG_FILE r88_regblock.v
 set_global_assignment -name VERILOG_FILE r88_alu.v
 set_global_assignment -name VERILOG_FILE r88_decoder.v
+set_global_assignment -name SDC_FILE Rocket88.sdc
+
+# Optimization
+set_global_assignment -name OPTIMIZATION_MODE BALANCED
+set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS ON
+
+# All I/O is 3.3 V
+set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
+
+
+# Clock and reset
+# ---------------
+set_location_assignment PIN_23 -to CLOCK_50
+set_location_assignment PIN_25 -to RESET_N
+
+# Keys (active low) and LEDs (active low)
+# ---------------------------------------
+# The DIP switch is wired in parallel with the keys.
+set_location_assignment PIN_88 -to KEY[0]
+set_location_assignment PIN_89 -to KEY[1]
+set_location_assignment PIN_90 -to KEY[2]
+set_location_assignment PIN_91 -to KEY[3]
+set_location_assignment PIN_87 -to LED[0]
+set_location_assignment PIN_86 -to LED[1]
+set_location_assignment PIN_85 -to LED[2]
+set_location_assignment PIN_84 -to LED[3]
+
+# 4-digit 7-segment display (common anode, all active low)
+# --------------------------------------------------------
+# DIG[0] (DIG1 on the schematic) is the rightmost digit.
+set_location_assignment PIN_133 -to DIG[0]
+set_location_assignment PIN_135 -to DIG[1]
+set_location_assignment PIN_136 -to DIG[2]
+set_location_assignment PIN_137 -to DIG[3]
+set_location_assignment PIN_128 -to SEG[0]
+set_location_assignment PIN_121 -to SEG[1]
+set_location_assignment PIN_125 -to SEG[2]
+set_location_assignment PIN_129 -to SEG[3]
+set_location_assignment PIN_132 -to SEG[4]
+set_location_assignment PIN_126 -to SEG[5]
+set_location_assignment PIN_124 -to SEG[6]
+set_location_assignment PIN_127 -to SEG[7]
+
+# VGA (one bit per color, through 1K resistors)
+# ---------------------------------------------
+set_location_assignment PIN_106 -to VGA_R
+set_location_assignment PIN_105 -to VGA_G
+set_location_assignment PIN_104 -to VGA_B
+set_location_assignment PIN_101 -to VGA_HS
+set_location_assignment PIN_103 -to VGA_VS
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to VGA_*
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_*
+
+# Speaker (through a PNP transistor, active low)
+# ----------------------------------------------
+set_location_assignment PIN_110 -to BEEP
+
+# PS/2 keyboard: the board's PS/2 port
+# ------------------------------------
+set_location_assignment PIN_119 -to PS2_KB_CLK
+set_location_assignment PIN_120 -to PS2_KB_DAT
+
+# PS/2 mouse: a second PS/2 socket wired to the 2x19 expansion header P1,
+# on the pins shared with the LCD connector (LCD D5 and D7), so the LCD
+# can't be fitted at the same time. Connect the socket's clock and data to
+# these pins, with 4.7K pull-up resistors to 3.3 V, and its power to the
+# header's 5 V and GND. The weak pull-ups are enough for short wires only.
+# ------------------------------------------------------------------------
+set_location_assignment PIN_10 -to PS2_MS_CLK
+set_location_assignment PIN_11 -to PS2_MS_DAT
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PS2_MS_CLK
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PS2_MS_DAT
+
+# SDRAM: HY57V641620 / K4S641632, 4M x 16 (8 MB)
+# ----------------------------------------------
+# SDRAM_CLK is on PLL1's dedicated clock output pin.
+set_location_assignment PIN_43 -to SDRAM_CLK
+set_location_assignment PIN_58 -to SDRAM_CKE
+set_location_assignment PIN_72 -to SDRAM_CS_N
+set_location_assignment PIN_71 -to SDRAM_RAS_N
+set_location_assignment PIN_70 -to SDRAM_CAS_N
+set_location_assignment PIN_69 -to SDRAM_WE_N
+set_location_assignment PIN_73 -to SDRAM_BA[0]
+set_location_assignment PIN_74 -to SDRAM_BA[1]
+set_location_assignment PIN_42 -to SDRAM_LDQM
+set_location_assignment PIN_55 -to SDRAM_UDQM
+set_location_assignment PIN_76 -to SDRAM_A[0]
+set_location_assignment PIN_77 -to SDRAM_A[1]
+set_location_assignment PIN_80 -to SDRAM_A[2]
+set_location_assignment PIN_83 -to SDRAM_A[3]
+set_location_assignment PIN_68 -to SDRAM_A[4]
+set_location_assignment PIN_67 -to SDRAM_A[5]
+set_location_assignment PIN_66 -to SDRAM_A[6]
+set_location_assignment PIN_65 -to SDRAM_A[7]
+set_location_assignment PIN_64 -to SDRAM_A[8]
+set_location_assignment PIN_60 -to SDRAM_A[9]
+set_location_assignment PIN_75 -to SDRAM_A[10]
+set_location_assignment PIN_59 -to SDRAM_A[11]
+set_location_assignment PIN_28 -to SDRAM_DQ[0]
+set_location_assignment PIN_30 -to SDRAM_DQ[1]
+set_location_assignment PIN_31 -to SDRAM_DQ[2]
+set_location_assignment PIN_32 -to SDRAM_DQ[3]
+set_location_assignment PIN_33 -to SDRAM_DQ[4]
+set_location_assignment PIN_34 -to SDRAM_DQ[5]
+set_location_assignment PIN_38 -to SDRAM_DQ[6]
+set_location_assignment PIN_39 -to SDRAM_DQ[7]
+set_location_assignment PIN_54 -to SDRAM_DQ[8]
+set_location_assignment PIN_53 -to SDRAM_DQ[9]
+set_location_assignment PIN_52 -to SDRAM_DQ[10]
+set_location_assignment PIN_51 -to SDRAM_DQ[11]
+set_location_assignment PIN_50 -to SDRAM_DQ[12]
+set_location_assignment PIN_49 -to SDRAM_DQ[13]
+set_location_assignment PIN_46 -to SDRAM_DQ[14]
+set_location_assignment PIN_44 -to SDRAM_DQ[15]
+
+# Keep the SDRAM's registers in the I/O cells, so that their timing is fixed
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_CS_N
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_RAS_N
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_CAS_N
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_WE_N
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_BA[*]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_A[*]
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_LDQM
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_UDQM
+set_instance_assignment -name FAST_OUTPUT_REGISTER ON -to SDRAM_DQ[*]
+set_instance_assignment -name FAST_OUTPUT_ENABLE_REGISTER ON -to SDRAM_DQ[*]
+set_instance_assignment -name FAST_INPUT_REGISTER ON -to SDRAM_DQ[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to SDRAM_*
+
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
