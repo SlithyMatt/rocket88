@@ -151,3 +151,4 @@ verilog/sim/*.ppm
 verilog/system/boot.lst
 verilog/output_files/
 verilog/incremental_db/
+verilog/sim/smoke_test.mem

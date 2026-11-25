@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Build the memory images for the Rocket88 computer (verilog/system).
 
-    python3 tools/build_system_roms.py
+    python3 tools/build_system_roms.py [program.asm]
 
 writes:
   verilog/system/font.mem   the default font, 256 characters of 8x8 pixels,
                             from the drawings below
-  verilog/system/boot.mem   verilog/system/boot.asm assembled with r88asm, as
-                            the 4096 bytes of boot RAM at $F000-$FFFF
+  verilog/system/boot.mem   verilog/system/boot.asm (or program.asm, such as
+                            verilog/system/examples/smoke_test.asm) assembled
+                            with r88asm, as the 4096 bytes of boot RAM at
+                            $F000-$FFFF. The program must fill that range,
+                            which it does when it sets the vectors at $FFFA.
 
 Both are plain $readmemh files with one byte per line and no addresses, so
 Quartus and Icarus can both load them. r88asm is built first if needed.
@@ -240,6 +243,9 @@ def write_mem(path, data):
 
 
 def main():
+    if len(sys.argv) > 2:
+        sys.exit("usage: build_system_roms.py [program.asm]")
+    source = os.path.abspath(sys.argv[1]) if len(sys.argv) == 2 else os.path.join(SYSTEM, "boot.asm")
     glyphs = font()
     write_mem(os.path.join(SYSTEM, "font.mem"), [b for g in glyphs for b in g])
 
@@ -248,15 +254,15 @@ def main():
         subprocess.check_call(["make", "-s", "-C", ASM_DIR])
     binary = os.path.join(SYSTEM, "boot.bin")
     listing = os.path.join(SYSTEM, "boot.lst")
-    subprocess.check_call([asm, "-o", binary, "-l", listing,
-                           os.path.join(SYSTEM, "boot.asm")])
+    subprocess.check_call([asm, "-o", binary, "-l", listing, source])
     with open(binary, "rb") as f:
         data = f.read()
     os.remove(binary)
     if len(data) != 4096:
-        sys.exit("boot.asm must fill $F000-$FFFF (got %d bytes)" % len(data))
+        sys.exit("%s must fill $F000-$FFFF (got %d bytes)" % (source, len(data)))
     write_mem(os.path.join(SYSTEM, "boot.mem"), data)
-    print("wrote font.mem (%d characters) and boot.mem" % len(glyphs))
+    print("wrote font.mem (%d characters) and boot.mem from %s"
+          % (len(glyphs), os.path.relpath(source, ROOT)))
 
 
 if __name__ == "__main__":

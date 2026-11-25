@@ -13,6 +13,7 @@ The first board is the Cyclone IV EP4CE6 development board ([board documentation
 | [r88_pll.v](r88_pll.v) | Clock generation (Cyclone IV E PLL, or a model for simulation) |
 | [boot.asm](boot.asm) | Boot program |
 | boot.mem, font.mem | Memory images, built by [tools/build_system_roms.py](../../tools/build_system_roms.py) |
+| [examples/smoke_test.asm](examples/smoke_test.asm) | Color bars and a tone on each key press, to test a newly programmed board |
 
 ## Building
 1. If you changed [boot.asm](boot.asm) or the font, rebuild the memory images from the repository root:
@@ -21,6 +22,21 @@ The first board is the Cyclone IV EP4CE6 development board ([board documentation
    ```
 2. Open `verilog/Rocket88.qpf` in Quartus Prime Lite (21.1 or later) and compile.
 3. Program the board with `output_files/Rocket88.sof` over JTAG.
+
+## Smoke Test
+[examples/smoke_test.asm](examples/smoke_test.asm) is the first program to run on a newly programmed board. It runs entirely inside the FPGA, without using the SDRAM, and polls everything without interrupts.
+* The screen shows eight color bars (white, yellow, cyan, green, magenta, red, blue and black), with a title at the bottom.
+* LED4 blinks about once a second, showing that the CPU and video are running.
+* Each key press on the PS/2 keyboard plays a 440 Hz beep for a quarter of a second and lights LED1 while it plays.
+* The display shows the number of keys pressed (left two digits) and the last scan code (right two digits).
+
+To run it, build it into the boot RAM image, then compile and program the board as usual. From the repository root:
+```
+python3 tools/build_system_roms.py verilog/system/examples/smoke_test.asm
+```
+Afterwards, run the script with no argument to go back to the normal boot program.
+
+[sim/tb_smoke.v](../sim/tb_smoke.v) checks the smoke test in simulation: the colors of the bars in a captured frame, the title, the tone and its timing, and the display. Its header has the commands to run it.
 
 ## Clocking
 Everything runs on a 50 MHz system clock from the PLL. The CPU is clocked at 1/16 of that, 3.125 MHz, so each two-step CPU cycle takes 640 ns, and an instruction of 2 cycles takes 1.28 µs. Each CPU clock period is a 16-clock bus slot. The CPU's address, Read, Write and data are latched 5 clocks after its clock edge. Any memory or I/O access then completes within the slot, and read data is ready 5 clocks before the next edge. Memory never makes the CPU wait.
