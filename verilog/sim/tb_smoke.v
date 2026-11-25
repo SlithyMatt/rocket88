@@ -199,13 +199,14 @@ initial begin
 	check(var_at(16'hFD02) - frames_before >= 2 && var_at(16'hFD02) - frames_before <= 4,
 		"frame counter at 60 Hz");
 	check(dut.system.sound.volume[0] == 0 && LED[0] == 1'b1, "silent before a key");
+	check(dut.system.hex_reg == 16'h0000 && dut.system.hex_enable, "display reads 0000 at boot");
 
 	// Press and release 'A' (scan code $1C)
 	keyboard.send(8'h1C);
 	wait_ms(1);
 	check(dut.system.sound.volume[0] == 15 && dut.system.sound.freq[0] == 16'd590
 		&& dut.system.sound.wave[0] == 2'd0, "key press plays a 440 Hz square wave");
-	check(dut.system.hex_reg == 16'h011C, "display shows 1 key, scan code 1C");
+	check(dut.system.hex_reg == 16'h0028, "display shows scan code 28 (decimal)");
 	edges_before = beep_edges;
 	wait_ms(20);
 	check(beep_edges - edges_before > 100, "speaker is driven");
@@ -213,7 +214,7 @@ initial begin
 	keyboard.send(8'hF0);
 	keyboard.send(8'h1C);
 	wait_ms(1);
-	check(dut.system.hex_reg == 16'h011C, "key release doesn't count");
+	check(dut.system.hex_reg == 16'h0028, "key release doesn't change the display");
 
 	// The tone stops after 15 frames
 	wait_ms(250);
@@ -227,7 +228,23 @@ initial begin
 	keyboard.send(8'hE0);
 	keyboard.send(8'h75);
 	wait_ms(1);
-	check(dut.system.sound.volume[0] == 15 && dut.system.hex_reg == 16'h0275, "extended key");
+	check(dut.system.sound.volume[0] == 15 && dut.system.hex_reg == 16'h0117, "extended key, shown as 0117");
+	keyboard.send(8'hF0);
+	keyboard.send(8'h75);
+
+	// More decimal conversions: F7 ($83), Backspace ($66), F9 ($01), F3 ($04), Esc ($76)
+	keyboard.send(8'h83);
+	wait_ms(1);
+	check(dut.system.hex_reg == 16'h0131, "scan code 83 shown as 0131");
+	keyboard.send(8'h66);
+	wait_ms(1);
+	check(dut.system.hex_reg == 16'h0102, "scan code 66 shown as 0102");
+	keyboard.send(8'h01);
+	wait_ms(1);
+	check(dut.system.hex_reg == 16'h0001, "scan code 01 shown as 0001");
+	keyboard.send(8'h76);
+	wait_ms(1);
+	check(dut.system.hex_reg == 16'h0118, "scan code 76 shown as 0118");
 
 	check(sdram.errors == 0, "SDRAM timing and protocol");
 	check(keyboard.errors == 0 && dut.system.keyboard.error == 1'b0, "PS/2 frames");

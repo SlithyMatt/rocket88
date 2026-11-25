@@ -28,7 +28,7 @@ The first board is the Cyclone IV EP4CE6 development board ([board documentation
 * The screen shows eight color bars (white, yellow, cyan, green, magenta, red, blue and black), with a title at the bottom.
 * LED4 blinks about once a second, showing that the CPU and video are running.
 * Each key press on the PS/2 keyboard plays a 440 Hz beep for a quarter of a second and lights LED1 while it plays.
-* The display shows the number of keys pressed (left two digits) and the last scan code (right two digits).
+* The 4-digit display reads 0000 at first, then shows the last key's scan code in decimal (0028 for A, whose scan code is $1C).
 
 To run it, build it into the boot RAM image, then compile and program the board as usual. From the repository root:
 ```

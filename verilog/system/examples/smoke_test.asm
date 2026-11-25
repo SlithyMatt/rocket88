@@ -9,8 +9,8 @@
 ;     black, with a title in white on black at the bottom
 ;   - LED4 blinks about once a second (the CPU and video are running)
 ;   - Each key press plays a short beep and lights LED1 while it plays
-;   - The display shows the number of keys pressed (left two digits) and
-;     the last key's scan code (right two digits)
+;   - The 4-digit display reads 0000 at first, then shows the last key's
+;     scan code in decimal (for example 0028 for A, whose scan code is $1C)
 ;
 ; To run it, build it into the boot RAM image and recompile in Quartus:
 ;   python3 tools/build_system_roms.py verilog/system/examples/smoke_test.asm
@@ -50,7 +50,6 @@ STACK_TOP   = $FD00         ; the stack grows down from $FCFF
 RELEASE     = $FD00         ; the last keyboard byte was $F0 (key up)
 TIMER       = $FD01         ; frames left in the tone
 FRAMES      = $FD02         ; frame counter
-KEY_COUNT   = $FD03         ; keys pressed
 ROWS        = $FD04         ; rows left to fill
 
 ; ---------------------------------------------------------------------------
@@ -73,7 +72,6 @@ reset:
     sta RELEASE
     sta TIMER
     sta FRAMES
-    sta KEY_COUNT
     lda #TONE.low
     sta V0_FREQ
     lda #TONE.high
@@ -197,11 +195,8 @@ check_key:
     jpnz key_released
 
     ; A key was pressed: show it and play the tone
-    stc HEX_L
-    lda KEY_COUNT
-    inc a
-    sta KEY_COUNT
-    sta HEX_H
+    lda c
+    jsr show_decimal
     lda #TONE_FRAMES
     sta TIMER
     lda #15
@@ -216,6 +211,36 @@ key_released:
     ldaz
     sta RELEASE
     jmp main
+
+; Show A (0-255) on the display in decimal, as 0000-0255. The display shows
+; the hex digits of HEX_H and HEX_L, so each gets a BCD digit.
+show_decimal:
+    ldbz                    ; B = hundreds
+hundreds:
+    sub #100
+    jmpc hundreds_done      ; borrowed: A was under 100
+    inc b
+    jmpr hundreds
+hundreds_done:
+    add #100                ; undo the last subtraction
+    stb HEX_H               ; left digits: 0 and the hundreds
+    ldbz                    ; B = tens
+tens:
+    sub #10
+    jmpc tens_done
+    inc b
+    jmpr tens
+tens_done:
+    add #10                 ; A = ones
+    ldc a
+    lda b
+    asl a
+    asl a
+    asl a
+    asl a
+    ora c                   ; tens in the high digit, ones in the low
+    sta HEX_L
+    rts
 
 ; Copy the zero-terminated string at BC to the screen at DD
 print:
